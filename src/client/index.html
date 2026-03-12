@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAIL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ═══ LOGIN SCREEN ═══ -->
+  <div id="login-screen" class="screen active">
+    <div class="login-container">
+      <div class="login-brand">
+        <div class="logo-mark">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect x="2" y="10" width="44" height="28" rx="3" stroke="currentColor" stroke-width="2.5" fill="none"/>
+            <polyline points="2,10 24,28 46,10" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1>MAIL</h1>
+        <p class="login-subtitle">Minimalistischer IMAP-Client</p>
+      </div>
+
+      <form id="login-form" class="login-form">
+        <div class="form-group" id="host-group">
+          <label for="host">IMAP Server</label>
+          <input type="text" id="host" placeholder="imap.gmail.com">
+        </div>
+        <div class="form-row" id="port-row">
+          <div class="form-group">
+            <label for="port">Port</label>
+            <input type="number" id="port" value="993">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="user">E-Mail</label>
+          <input type="email" id="user" placeholder="name@example.com" required>
+        </div>
+        <div class="form-group">
+          <label for="pass">Passwort / App-Passwort</label>
+          <input type="password" id="pass" placeholder="••••••••" required>
+        </div>
+        <details class="smtp-details">
+          <summary>SMTP-Einstellungen (optional)</summary>
+          <div class="form-row" style="margin-top:0.75rem">
+            <div class="form-group flex-grow">
+              <label for="smtp-host">SMTP Server</label>
+              <input type="text" id="smtp-host" placeholder="smtp.example.com (auto)">
+            </div>
+            <div class="form-group">
+              <label for="smtp-port">Port</label>
+              <input type="number" id="smtp-port" value="465">
+            </div>
+          </div>
+          <p class="hint-text">Leer lassen = automatisch aus IMAP-Host abgeleitet (imap.→smtp.)</p>
+        </details>
+        <button type="submit" id="login-btn" class="btn-primary">
+          <span class="btn-text">Verbinden</span>
+          <span class="btn-loading" style="display:none">
+            <span class="spinner"></span> Verbinde…
+          </span>
+        </button>
+        <div id="login-error" class="error-msg" style="display:none"></div>
+      </form>
+
+      <div class="login-hints">
+        <details>
+          <summary>Gmail-Nutzer?</summary>
+          <p>Erstelle ein <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App-Passwort</a> unter Google-Konto → Sicherheit → App-Passwörter.</p>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MAIL APP ═══ -->
+  <div id="app-screen" class="screen">
+    <div class="app-layout">
+
+      <!-- ── Sidebar: Ordner ── -->
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-brand">MAIL</div>
+          <div class="sidebar-header-actions">
+            <button id="compose-btn" class="btn-icon btn-compose" title="Neue E-Mail">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button id="settings-btn" class="btn-icon" title="Einstellungen">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            </button>
+            <button id="disconnect-btn" class="btn-icon" title="Abmelden">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            </button>
+          </div>
+        </div>
+        <nav id="folder-list" class="folder-list">
+          <div class="loading-indicator">Lade Ordner…</div>
+        </nav>
+        <div class="sidebar-footer">
+          <span id="connection-info" class="connection-info"></span>
+        </div>
+      </aside>
+
+      <!-- ── Nachrichtenliste ── -->
+      <main id="message-list-panel" class="message-list-panel">
+        <div class="panel-header">
+          <h2 id="current-folder-name">INBOX</h2>
+          <div class="panel-actions">
+            <button id="refresh-btn" class="btn-icon" title="Aktualisieren">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="message-list" class="message-list">
+          <div class="empty-state">
+            <p>Wähle einen Ordner aus</p>
+          </div>
+        </div>
+      </main>
+
+      <!-- ── Nachricht lesen ── -->
+      <section id="message-detail" class="message-detail">
+        <div class="detail-placeholder">
+          <svg width="64" height="64" viewBox="0 0 48 48" fill="none" opacity="0.15">
+            <rect x="2" y="10" width="44" height="28" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
+            <polyline points="2,10 24,28 46,10" stroke="currentColor" stroke-width="2" fill="none"/>
+          </svg>
+          <p>Nachricht auswählen</p>
+        </div>
+
+        <div id="detail-content" class="detail-content" hidden>
+          <div class="detail-header">
+            <button id="close-detail" class="btn-icon btn-back" title="Zurück">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            </button>
+            <div class="detail-meta">
+              <h2 id="detail-subject"></h2>
+              <div class="detail-addresses">
+                <div class="detail-from">
+                  <span class="label">Von</span>
+                  <span id="detail-from-addr"></span>
+                </div>
+                <div class="detail-to">
+                  <span class="label">An</span>
+                  <span id="detail-to-addr"></span>
+                </div>
+                <div class="detail-date">
+                  <span id="detail-date"></span>
+                </div>
+              </div>
+            </div>
+            <div class="detail-actions">
+              <button id="toggle-images-btn" class="btn-small" hidden>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                Bilder laden
+              </button>
+            </div>
+          </div>
+
+          <!-- Blockierte Bilder Warnung -->
+          <div id="blocked-images-bar" class="blocked-images-bar" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>Externe Bilder blockiert (Tracking-Schutz)</span>
+            <button id="allow-images-btn" class="btn-tiny">Freigeben</button>
+          </div>
+
+          <!-- Anhänge -->
+          <div id="attachments-bar" class="attachments-bar" hidden>
+            <div class="attachments-label">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              Anhänge
+            </div>
+            <div id="attachments-list" class="attachments-list"></div>
+          </div>
+
+          <!-- Mail-Body -->
+          <div class="detail-body-wrapper">
+            <div class="detail-body-tabs">
+              <button id="tab-html" class="tab active" data-tab="html">Formatiert</button>
+              <button id="tab-text" class="tab" data-tab="text">Nur Text</button>
+            </div>
+            <div id="body-html" class="detail-body active">
+              <iframe id="html-frame" sandbox="allow-same-origin" class="mail-iframe"></iframe>
+            </div>
+            <div id="body-text" class="detail-body">
+              <pre id="text-content" class="text-content"></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- ═══ SETTINGS PANEL ═══ -->
+  <div id="settings-overlay" class="settings-overlay">
+    <div class="settings-panel">
+      <div class="settings-header">
+        <h3>Einstellungen</h3>
+        <button id="settings-close" class="btn-icon" title="Schließen">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="settings-body">
+        <div class="settings-section">
+          <h4>Farbschema</h4>
+          <div class="theme-grid">
+            <button class="theme-card active" data-theme="kupfer">
+              <div class="theme-preview">
+                <span class="tp-bg" style="background:#0a0a0a"></span>
+                <span class="tp-sidebar" style="background:#111111"></span>
+                <span class="tp-accent" style="background:#c4956a"></span>
+              </div>
+              <span class="theme-name">Kupfer</span>
+              <span class="theme-desc">Dunkel · Warm</span>
+            </button>
+            <button class="theme-card" data-theme="arktis">
+              <div class="theme-preview">
+                <span class="tp-bg" style="background:#0b0e14"></span>
+                <span class="tp-sidebar" style="background:#0f1319"></span>
+                <span class="tp-accent" style="background:#5b9bd5"></span>
+              </div>
+              <span class="theme-name">Arktis</span>
+              <span class="theme-desc">Dunkel · Kühl</span>
+            </button>
+            <button class="theme-card" data-theme="terminal">
+              <div class="theme-preview">
+                <span class="tp-bg" style="background:#050505"></span>
+                <span class="tp-sidebar" style="background:#0a0a0a"></span>
+                <span class="tp-accent" style="background:#4ae04a"></span>
+              </div>
+              <span class="theme-name">Terminal</span>
+              <span class="theme-desc">Dunkel · Retro</span>
+            </button>
+            <button class="theme-card" data-theme="sandstein">
+              <div class="theme-preview">
+                <span class="tp-bg" style="background:#f5f0e8"></span>
+                <span class="tp-sidebar" style="background:#ece5da"></span>
+                <span class="tp-accent" style="background:#a0623a"></span>
+              </div>
+              <span class="theme-name">Sandstein</span>
+              <span class="theme-desc">Hell · Warm</span>
+            </button>
+            <button class="theme-card" data-theme="mitternacht">
+              <div class="theme-preview">
+                <span class="tp-bg" style="background:#0e0e1a"></span>
+                <span class="tp-sidebar" style="background:#131320"></span>
+                <span class="tp-accent" style="background:#d4a54a"></span>
+              </div>
+              <span class="theme-name">Mitternacht</span>
+              <span class="theme-desc">Dunkel · Elegant</span>
+            </button>
+            <button class="theme-card" data-theme="wolke">
+              <div class="theme-preview">
+                <span class="tp-bg" style="background:#f8f9fb"></span>
+                <span class="tp-sidebar" style="background:#eef1f5"></span>
+                <span class="tp-accent" style="background:#3b6fb5"></span>
+              </div>
+              <span class="theme-name">Wolke</span>
+              <span class="theme-desc">Hell · Klar</span>
+            </button>
+            <button class="theme-card" data-theme="lavendel">
+              <div class="theme-preview">
+                <span class="tp-bg" style="background:#f7f4fa"></span>
+                <span class="tp-sidebar" style="background:#eee8f4"></span>
+                <span class="tp-accent" style="background:#7c4dba"></span>
+              </div>
+              <span class="theme-name">Lavendel</span>
+              <span class="theme-desc">Hell · Soft</span>
+            </button>
+            <button class="theme-card" data-theme="moos">
+              <div class="theme-preview">
+                <span class="tp-bg" style="background:#f4f8f4"></span>
+                <span class="tp-sidebar" style="background:#e8f0e8"></span>
+                <span class="tp-accent" style="background:#3a7a4a"></span>
+              </div>
+              <span class="theme-name">Moos</span>
+              <span class="theme-desc">Hell · Frisch</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ COMPOSE MODAL ═══ -->
+  <div id="compose-overlay" class="compose-overlay">
+    <div class="compose-modal">
+      <div class="compose-header">
+        <h3 id="compose-title">Neue Nachricht</h3>
+        <div class="compose-header-actions">
+          <button id="compose-minimize" class="btn-icon" title="Minimieren">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button id="compose-close" class="btn-icon" title="Verwerfen">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <form id="compose-form" class="compose-form">
+        <div class="compose-field">
+          <label>Von</label>
+          <input type="text" id="compose-from" readonly>
+        </div>
+        <div class="compose-field">
+          <label>An</label>
+          <input type="text" id="compose-to" placeholder="empfaenger@example.com" required>
+        </div>
+        <div class="compose-field compose-cc-field" hidden>
+          <label>CC</label>
+          <input type="text" id="compose-cc" placeholder="cc@example.com">
+        </div>
+        <div class="compose-field compose-bcc-field" hidden>
+          <label>BCC</label>
+          <input type="text" id="compose-bcc" placeholder="bcc@example.com">
+        </div>
+        <div class="compose-field-row">
+          <div class="compose-field flex-grow">
+            <label>Betreff</label>
+            <input type="text" id="compose-subject" placeholder="Betreff">
+          </div>
+          <div class="compose-toggles">
+            <button type="button" id="toggle-cc" class="btn-tiny-ghost" title="CC/BCC anzeigen">CC/BCC</button>
+          </div>
+        </div>
+        <div class="compose-body-wrapper">
+          <textarea id="compose-body" class="compose-body" placeholder="Nachricht schreiben…"></textarea>
+        </div>
+        <div class="compose-footer">
+          <button type="submit" id="compose-send-btn" class="btn-primary btn-send">
+            <span class="btn-text">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Senden
+            </span>
+            <span class="btn-loading" style="display:none">
+              <span class="spinner"></span> Sende…
+            </span>
+          </button>
+          <div id="compose-status" class="compose-status"></div>
+        </div>
+
+        <!-- Versteckte Felder für Reply-Threading -->
+        <input type="hidden" id="compose-in-reply-to">
+        <input type="hidden" id="compose-references">
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

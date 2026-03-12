@@ -1,0 +1,46 @@
+services:
+  app:
+    build: .
+    container_name: mailapp
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - BIND_ADDRESS=0.0.0.0
+      - APP_DOMAIN=mail.mauch.ai
+      - TRUST_PROXY=1
+      - REDIS_URL=redis://redis:6379
+      - IMAP_HOST=mail.cyon.ch
+      - IMAP_PORT=993
+      - SMTP_HOST=mail.cyon.ch
+      - SMTP_PORT=465
+      - TLS_REJECT_UNAUTHORIZED=false
+      - SESSION_SECRET=${SESSION_SECRET}
+      - MAX_SESSIONS=50
+      - SESSION_TIMEOUT=1800000
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/config"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: mailapp-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+
+volumes:
+  redis_data:

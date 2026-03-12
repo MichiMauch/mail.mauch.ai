@@ -1,0 +1,43 @@
+{
+  "imap": {
+    "host": "imap.example.com",
+    "port": 993,
+    "secure": true,
+    "auth": {
+      "user": "your-email@example.com",
+      "pass": "your-password"
+    },
+    "tls": {
+      "rejectUnauthorized": true
+    }
+  },
+  "smtp": {
+    "host": "smtp.example.com",
+    "port": 465,
+    "secure": true,
+    "auth": {
+      "user": "your-email@example.com",
+      "pass": "your-password"
+    }
+  },
+  "server": {
+    "port": 3000
+  },
+  "defaults": {
+    "fetchCount": 50,
+    "defaultFolder": "INBOX"
+  },
+  "security": {
+    "blockExternalImages": true,
+    "allowedTags": [
+      "p", "br", "b", "i", "u", "strong", "em", "a", "ul", "ol", "li",
+      "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre", "code",
+      "table", "thead", "tbody", "tr", "td", "th", "span", "div", "img",
+      "hr", "sub", "sup", "dl", "dt", "dd"
+    ],
+    "forbiddenTags": [
+      "script", "iframe", "object", "embed", "form", "input", "textarea",
+      "select", "button", "style", "link", "meta", "base", "applet"
+    ]
+  }
+}
