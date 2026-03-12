@@ -206,6 +206,10 @@ if (APP_DOMAIN) {
   ALLOWED_HOSTS.add(`${APP_DOMAIN}:${PORT}`);
   ALLOWED_HOSTS.add(`${APP_DOMAIN}:443`);
 }
+// Extra Hosts (z.B. sslip.io für Coolify-Tests)
+if (process.env.EXTRA_HOSTS) {
+  process.env.EXTRA_HOSTS.split(',').forEach(h => ALLOWED_HOSTS.add(h.trim()));
+}
 
 app.use((req, res, next) => {
   const host = (req.headers.host || '').toLowerCase();
