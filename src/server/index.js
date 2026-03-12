@@ -302,9 +302,19 @@ const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toSt
 let sessionStore = undefined; // undefined = MemoryStore (Dev-Fallback)
 if (process.env.REDIS_URL) {
   try {
-    const redisClient = createRedisClient({ url: process.env.REDIS_URL });
+    const redisClient = createRedisClient({
+      url: process.env.REDIS_URL,
+      socket: { connectTimeout: 5000, reconnectStrategy: (retries) => retries > 3 ? false : 1000 },
+    });
     redisClient.on('error', (err) => console.error('[Redis] Error:', err.message));
-    await redisClient.connect();
+
+    // Timeout: Wenn Redis nach 5s nicht erreichbar ist → MemoryStore
+    const connectPromise = redisClient.connect();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Redis connect timeout (5s)')), 5000)
+    );
+    await Promise.race([connectPromise, timeoutPromise]);
+
     sessionStore = new RedisStore({ client: redisClient, prefix: 'mail:' });
     console.log(`[Redis] Session-Store verbunden (${process.env.REDIS_URL})`);
   } catch (err) {
