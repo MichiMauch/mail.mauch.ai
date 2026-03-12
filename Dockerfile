@@ -1,32 +1,20 @@
 FROM node:20-alpine
 
-# Redis installieren
 RUN apk add --no-cache redis su-exec
 
-# App-User erstellen
 RUN addgroup -S mailapp && adduser -S mailapp -G mailapp
 
 WORKDIR /app
 
-# Dependencies
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-# App-Code
 COPY config/ ./config/
 COPY src/ ./src/
-
-# Verzeichnisse
-RUN mkdir -p logs && chown -R mailapp:mailapp logs /app
-
-# Start-Script: Redis als root, dann Node als mailapp
-COPY <<'EOF' /app/start.sh
-#!/bin/sh
-redis-server --daemonize yes --maxmemory 128mb --maxmemory-policy allkeys-lru --save "" --loglevel warning
-echo "[Redis] gestartet"
-exec su-exec mailapp node src/server/index.js
-EOF
+COPY start.sh ./start.sh
 RUN chmod +x /app/start.sh
+
+RUN mkdir -p logs && chown -R mailapp:mailapp logs /app
 
 EXPOSE 3000
 
