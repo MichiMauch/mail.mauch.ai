@@ -394,7 +394,7 @@ function renderMessage(msg, uid) {
       </div>
     ` : ''}
     <div class="detail-header">
-      <button class="btn-icon btn-back" title="Zurück" onclick="closeDetail()">
+      <button class="btn-icon btn-back" data-action="close-detail" title="Zurück">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       </button>
       <div class="detail-meta">
@@ -413,7 +413,7 @@ function renderMessage(msg, uid) {
       </div>
       <div class="detail-actions">
         ${hasBlockedImages ? `
-          <button class="btn-small" onclick="openMessage(${uid}, true)">
+          <button class="btn-small" data-action="allow-images" data-uid="${uid}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             Bilder laden
           </button>
@@ -423,20 +423,20 @@ function renderMessage(msg, uid) {
 
     <div class="detail-reply-actions">
       ${state.smtpReady ? `
-        <button class="btn-reply" onclick="handleReply(${uid}, false)">
+        <button class="btn-reply" data-action="reply" data-uid="${uid}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
           Antworten
         </button>
-        <button class="btn-reply" onclick="handleReply(${uid}, true)">
+        <button class="btn-reply" data-action="reply-all" data-uid="${uid}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 17 4 12 9 7"/><polyline points="15 17 10 12 15 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
           Allen antworten
         </button>
-        <button class="btn-reply" onclick="handleForward(${uid})">
+        <button class="btn-reply" data-action="forward" data-uid="${uid}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 014-4h12"/></svg>
           Weiterleiten
         </button>
       ` : ''}
-      <button class="btn-reply btn-delete" onclick="handleDelete(${uid})">
+      <button class="btn-reply btn-delete" data-action="delete" data-uid="${uid}">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
         Löschen
       </button>
@@ -446,7 +446,7 @@ function renderMessage(msg, uid) {
       <div class="blocked-images-bar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         <span>${msg.blockedImages.length} externe(s) Bild(er) blockiert (Tracking-Schutz)</span>
-        <button class="btn-tiny" onclick="openMessage(${uid}, true)">Freigeben</button>
+        <button class="btn-tiny" data-action="allow-images" data-uid="${uid}">Freigeben</button>
       </div>
     ` : ''}
 
@@ -821,9 +821,26 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Zurück-Button (Detail schließen)
+// Zentrale Event-Delegation für dynamische Buttons (data-action)
+// Nötig weil CSP inline onclick blockiert
 document.addEventListener('click', (e) => {
-  if (e.target.closest('#close-detail')) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const uid = parseInt(btn.dataset.uid);
+  switch (action) {
+    case 'close-detail': closeDetail(); break;
+    case 'allow-images': openMessage(uid, true); break;
+    case 'reply':        handleReply(uid, false); break;
+    case 'reply-all':    handleReply(uid, true); break;
+    case 'forward':      handleForward(uid); break;
+    case 'delete':       handleDelete(uid); break;
+  }
+});
+
+// Zurück-Button (auch .btn-back ohne data-action, z.B. aus statischem HTML)
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#close-detail') || e.target.closest('.btn-back:not([data-action])')) {
     closeDetail();
   }
 });
