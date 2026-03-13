@@ -84,21 +84,30 @@ function handleSessionExpired() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  THEME
+//  THEME & LAYOUT
 // ═══════════════════════════════════════════════════════════
 function applyTheme(name) {
   document.documentElement.setAttribute('data-theme', name);
   localStorage.setItem('mail-theme', name);
-  // Aktive Karte markieren
   $$('.theme-card').forEach(card => {
     card.classList.toggle('active', card.dataset.theme === name);
   });
 }
 
-// Gespeichertes Theme beim Start laden
-(function initTheme() {
-  const saved = localStorage.getItem('mail-theme') || 'kupfer';
-  document.documentElement.setAttribute('data-theme', saved);
+function applyLayout(name) {
+  document.documentElement.setAttribute('data-layout', name);
+  localStorage.setItem('mail-layout', name);
+  $$('.layout-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.layout === name);
+  });
+}
+
+// Gespeichertes Theme + Layout beim Start laden
+(function initThemeAndLayout() {
+  const savedTheme = localStorage.getItem('mail-theme') || 'kupfer';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  const savedLayout = localStorage.getItem('mail-layout') || 'classic';
+  document.documentElement.setAttribute('data-layout', savedLayout);
 })();
 
 // ═══════════════════════════════════════════════════════════
@@ -108,9 +117,14 @@ function openSettings() {
   const overlay = $('#settings-overlay');
   overlay.classList.add('open');
   // Aktives Theme markieren
-  const current = localStorage.getItem('mail-theme') || 'kupfer';
+  const currentTheme = localStorage.getItem('mail-theme') || 'kupfer';
   $$('.theme-card').forEach(card => {
-    card.classList.toggle('active', card.dataset.theme === current);
+    card.classList.toggle('active', card.dataset.theme === currentTheme);
+  });
+  // Aktives Layout markieren
+  const currentLayout = localStorage.getItem('mail-layout') || 'classic';
+  $$('.layout-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.layout === currentLayout);
   });
 }
 
@@ -821,6 +835,11 @@ document.addEventListener('click', (e) => {
   const card = e.target.closest('.theme-card');
   if (card && card.dataset.theme) {
     applyTheme(card.dataset.theme);
+  }
+  // Layout-Card geklickt
+  const layoutCard = e.target.closest('.layout-card');
+  if (layoutCard && layoutCard.dataset.layout) {
+    applyLayout(layoutCard.dataset.layout);
   }
 });
 
