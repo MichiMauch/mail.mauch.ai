@@ -23,7 +23,9 @@
 15. [Schicht 14 – Automatisierte Tests](#15-schicht-14--automatisierte-tests)
 16. [Konfiguration](#16-konfiguration)
 17. [Deployment auf öffentlichen Servern](#17-deployment-auf-öffentlichen-servern)
-18. [Bekannte Einschränkungen](#18-bekannte-einschränkungen)
+18. [Schicht 15 – Container-Sicherheit (Docker)](#18-schicht-15--container-sicherheit-docker)
+19. [Schicht 16 – Host-Header-Erweiterung](#19-schicht-16--host-header-erweiterung)
+20. [Bekannte Einschränkungen](#20-bekannte-einschränkungen)
 
 ---
 
@@ -1230,18 +1232,104 @@ Der Code erkennt `NODE_ENV=production` automatisch und aktiviert:
 
 ---
 
-## 18. Bekannte Einschränkungen
+## 18. Schicht 15 – Container-Sicherheit (Docker)
+
+### Non-Root Execution
+
+Die Applikation läuft im Docker-Container **nicht als root**:
+
+```dockerfile
+RUN addgroup -S mailapp && adduser -S mailapp -G mailapp
+# ...
+CMD ["su-exec", "mailapp", "node", "src/server/index.js"]
+```
+
+- **Dedizierter System-User** `mailapp` ohne Login-Shell
+- **`su-exec`** statt `sudo` (kein SUID-Binary nötig)
+- Selbst bei einer RCE-Schwachstelle hat der Angreifer nur eingeschränkte Rechte
+
+### Minimal Base Image
+
+```dockerfile
+FROM node:20-alpine
+```
+
+- **Alpine Linux**: ~5 MB Base-Image statt ~900 MB (Debian)
+- Keine unnötigen Pakete (kein `curl`, `wget`, `gcc`, `make`, etc.)
+- Kleinere Angriffsfläche: weniger CVEs, weniger Binaries für Exploitation
+
+### Build-Hygiene
+
+```dockerfile
+RUN npm ci --omit=dev && npm cache clean --force
+```
+
+- **`npm ci`**: Reproduzierbare Builds aus `package-lock.json`
+- **`--omit=dev`**: Keine Dev-Dependencies im Production-Image
+- **Cache gelöscht**: Kein npm-Cache im finalen Image
+
+### Env-Var Isolation
+
+Sensible Variablen (`SESSION_SECRET`, Credentials) werden **nicht** im Image gebacken:
+- Injection zur **Laufzeit** über Coolify/Docker-Environment
+- Kein `ENV SESSION_SECRET=...` im Dockerfile
+- `.env.local` in `.dockerignore` → wird nie ins Image kopiert
+
+### Redis Connect-Timeout
+
+Falls Redis nicht erreichbar ist, blockiert die App **nicht**:
+
+```javascript
+const timeoutPromise = new Promise((_, reject) =>
+  setTimeout(() => reject(new Error('Redis connect timeout (5s)')), 5000)
+);
+await Promise.race([connectPromise, timeoutPromise]);
+```
+
+- **5-Sekunden-Timeout** für Redis-Verbindung
+- **Automatischer Fallback** auf MemoryStore
+- **Reconnect-Strategie**: Max 3 Versuche, dann aufgeben
+
+### Healthcheck
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/config || exit 1
+```
+
+- Docker/Coolify erkennt automatisch wenn die App nicht mehr antwortet
+- Container wird nach 3 fehlgeschlagenen Checks als `unhealthy` markiert
+- Orchestrator kann automatisch neustarten
+
+---
+
+## 19. Schicht 16 – Host-Header-Erweiterung
+
+### EXTRA_HOSTS
+
+Für Deployment-Szenarien mit dynamischen Domains (z.B. Coolify sslip.io):
+
+```
+EXTRA_HOSTS=staging.example.com,test.78.46.189.129.sslip.io
+```
+
+- Komma-separierte Liste zusätzlicher erlaubter Host-Header
+- Ergänzt die automatische Whitelist (`localhost`, `APP_DOMAIN`)
+- Nützlich für Staging/Testing ohne den DNS-Rebinding-Schutz zu schwächen
+
+---
+
+## 20. Bekannte Einschränkungen
 
 | Einschränkung | Risiko | Empfehlung |
 |---|---|---|
-| Kein HTTPS auf localhost | Niedrig (nur lokaler Zugriff) | Nginx-Reverse-Proxy mit Let's Encrypt für Remote-Zugriff |
-| Kein Multi-User | N/A | Eine IMAP-Session pro Server-Instanz |
-| Session-Store im RAM | Niedrig | Bei Cluster-Betrieb: Redis-basierter Session-Store |
+| Kein HTTPS auf localhost | Niedrig (nur lokaler Zugriff) | Reverse-Proxy mit Let's Encrypt (Coolify/Traefik) |
+| MemoryStore ohne Redis | Niedrig | Sessions gehen bei Restart verloren; Redis für Persistenz |
 | Passwort im RAM | Niedrig | Bei Bedarf: Verschlüsselter Keyring oder Vault-Integration |
-| `TLS_REJECT_UNAUTHORIZED=false` | Mittel | Nur für Entwicklung nutzen, in Produktion immer `true` |
+| `TLS_REJECT_UNAUTHORIZED=false` | Mittel | Nur für Entwicklung/spezifische Provider, in Produktion `true` |
 | Kein S/MIME oder PGP | Mittel | Ende-zu-Ende-Verschlüsselung nicht implementiert |
 | OAuth2 nur vorbereitet | Niedrig | Token-Beschaffung (OAuth-Flow) muss extern erfolgen |
-| Rate-Limit-Bypass hinter Proxy | Mittel | `trust proxy` konfigurieren + Nginx `X-Forwarded-For` überschreiben |
+| Rate-Limit-Bypass hinter Proxy | Mittel | `trust proxy` konfigurieren + `X-Forwarded-For` überschreiben |
 | V8 GC: Passwörter im RAM | Niedrig | Buffer + `.fill(0)` statt Strings für Hochsicherheit |
 | Kein Virenscan für Anhänge | Mittel | ClamAV-Integration oder externer Scan-Service empfohlen |
 | Logs nicht verschlüsselt | Niedrig | Bei sensiblen Umgebungen: Log-Verschlüsselung oder SIEM |
