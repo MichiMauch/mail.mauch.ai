@@ -513,16 +513,37 @@ input[type="number"] { width: 80px; }
   white-space: nowrap;
 }
 
-.sidebar-footer {
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--border);
+/* ── Sidebar User (oben, unter Header) ───────────────── */
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-user-icon {
+  color: var(--accent);
+  flex-shrink: 0;
 }
 
 .connection-info {
   font-family: var(--font-display);
-  font-size: 0.6rem;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Sidebar Footer (Settings + Logout unten) ────────── */
+.sidebar-footer {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 0.25rem;
 }
 
 .loading-indicator {
@@ -1858,13 +1879,32 @@ input[type="number"] { width: 80px; }
   width: 1.5rem;
 }
 
-[data-layout="gmail"] .sidebar-footer {
-  border-top: none;
-  padding: 8px 16px;
+/* Gmail: User-Anzeige prominent */
+[data-layout="gmail"] .sidebar-user {
+  padding: 10px 16px 10px 24px;
+  border-bottom: none;
+  gap: 10px;
+}
+
+[data-layout="gmail"] .sidebar-user-icon {
+  color: var(--accent);
+  width: 20px;
+  height: 20px;
 }
 
 [data-layout="gmail"] .connection-info {
-  font-size: 0.65rem;
+  font-family: var(--gm-font);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--gm-on-surface);
+}
+
+/* Gmail: Footer mit Settings + Logout unten */
+[data-layout="gmail"] .sidebar-footer {
+  border-top: 1px solid var(--gm-outline);
+  padding: 8px 12px;
+  display: flex;
+  gap: 4px;
 }
 
 /* ════════════════════════════════════════════════════════════
