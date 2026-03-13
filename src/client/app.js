@@ -301,6 +301,8 @@ async function loadMessages(folder) {
     }
 
     container.innerHTML = '';
+    const isGmail = document.documentElement.getAttribute('data-layout') === 'gmail';
+
     for (const msg of state.messages) {
       const el = document.createElement('div');
       el.className = `message-item${!msg.seen ? ' unread' : ''}`;
@@ -308,18 +310,34 @@ async function loadMessages(folder) {
 
       const fromName = msg.from?.[0]?.name || msg.from?.[0]?.address || 'Unbekannt';
       const date = formatDate(msg.date);
+      const subject = msg.subject || '(Kein Betreff)';
+      const snippet = msg.snippet || '';
 
-      el.innerHTML = `
-        <div class="msg-top-row">
+      if (isGmail) {
+        // Gmail-Layout: Eine Zeile – From | Subject - Snippet | Icons | Date
+        el.innerHTML = `
+          <span class="msg-star">${msg.flagged ? '★' : '☆'}</span>
           <span class="msg-from">${escapeHtml(fromName)}</span>
+          <span class="msg-subject-line">
+            <span class="msg-subject">${escapeHtml(subject)}</span>${snippet ? `<span class="msg-snippet"> – ${escapeHtml(snippet)}</span>` : ''}
+          </span>
+          <span class="msg-icons">${msg.hasAttachments ? '📎' : ''}</span>
           <span class="msg-date">${date}</span>
-        </div>
-        <div class="msg-subject">${escapeHtml(msg.subject)}</div>
-        <div class="msg-indicators">
-          ${msg.hasAttachments ? '<span class="indicator attachment">📎</span>' : ''}
-          ${msg.flagged ? '<span class="indicator flagged">★</span>' : ''}
-        </div>
-      `;
+        `;
+      } else {
+        // Klassisches Layout
+        el.innerHTML = `
+          <div class="msg-top-row">
+            <span class="msg-from">${escapeHtml(fromName)}</span>
+            <span class="msg-date">${date}</span>
+          </div>
+          <div class="msg-subject">${escapeHtml(subject)}</div>
+          <div class="msg-indicators">
+            ${msg.hasAttachments ? '<span class="indicator attachment">📎</span>' : ''}
+            ${msg.flagged ? '<span class="indicator flagged">★</span>' : ''}
+          </div>
+        `;
+      }
 
       el.addEventListener('click', () => openMessage(msg.uid));
       container.appendChild(el);
