@@ -812,6 +812,13 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// Zurück-Button (Detail schließen)
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#close-detail')) {
+    closeDetail();
+  }
+});
+
 // Disconnect
 document.addEventListener('click', (e) => {
   if (e.target.closest('#disconnect-btn')) {
