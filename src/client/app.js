@@ -352,7 +352,12 @@ async function openMessage(uid, allowImages = false) {
   `;
 
   // Responsive: Detail anzeigen
-  $('.app-layout').classList.add('show-detail');
+  const layout = $('.app-layout');
+  layout.classList.add('show-detail');
+  // Gmail-Layout: Liste ausblenden, Detail einblenden
+  if (document.documentElement.getAttribute('data-layout') === 'gmail') {
+    layout.classList.add('gmail-show-detail');
+  }
 
   try {
     const msg = await api.message(state.currentFolder, uid, allowImages);
@@ -562,7 +567,11 @@ function closeDetail() {
   const section = $('#message-detail');
   if (section) section.classList.remove('has-message');
   $$('.message-item').forEach(el => el.classList.remove('active'));
-  $('.app-layout')?.classList.remove('show-detail');
+  const layout = $('.app-layout');
+  if (layout) {
+    layout.classList.remove('show-detail');
+    layout.classList.remove('gmail-show-detail');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
