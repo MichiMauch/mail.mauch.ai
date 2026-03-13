@@ -822,6 +822,47 @@ app.post('/api/flags/:folder/:uid', requireAuth, ensureConnection, async (req, r
   }
 });
 
+// ── GET /api/search/:folder?q=... ──────────────────────────
+app.get('/api/search/:folder', requireAuth, ensureConnection, async (req, res) => {
+  try {
+    const folder = decodeURIComponent(req.params.folder);
+    const query = sanitizeString(req.query.q || '', 200);
+    if (!validateFolder(folder)) {
+      return res.status(400).json({ error: 'Ungültiger Ordnername.' });
+    }
+    if (!query || query.length < 2) {
+      return res.status(400).json({ error: 'Suchbegriff muss mindestens 2 Zeichen lang sein.' });
+    }
+    const count = Math.min(Math.max(parseInt(req.query.count) || 50, 1), 200);
+    const messages = await req.imap.search(folder, query, { count });
+    res.json({ folder, query, total: messages.length, messages });
+  } catch (err) {
+    res.status(500).json({ error: 'Suche fehlgeschlagen', details: err.message });
+  }
+});
+
+// ── POST /api/delete-bulk/:folder ──────────────────────────
+app.post('/api/delete-bulk/:folder', requireAuth, ensureConnection, async (req, res) => {
+  try {
+    const folder = decodeURIComponent(req.params.folder);
+    const { uids } = req.body;
+    if (!validateFolder(folder)) {
+      return res.status(400).json({ error: 'Ungültiger Ordnername.' });
+    }
+    if (!Array.isArray(uids) || uids.length === 0 || uids.length > 100) {
+      return res.status(400).json({ error: 'Ungültige UIDs (1-100 erlaubt).' });
+    }
+    const validUids = uids.map(u => parseInt(u)).filter(u => u > 0 && u < 2 ** 32);
+    if (validUids.length === 0) {
+      return res.status(400).json({ error: 'Keine gültigen UIDs.' });
+    }
+    const result = await req.imap.deleteMessages(folder, validUids);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: 'Bulk-Löschen fehlgeschlagen', details: err.message });
+  }
+});
+
 // ── DELETE /api/message/:folder/:uid ───────────────────────
 app.delete('/api/message/:folder/:uid', requireAuth, ensureConnection, async (req, res) => {
   try {

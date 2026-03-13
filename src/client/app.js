@@ -19,6 +19,9 @@ const state = {
   smtpReady: false,
   user: '',
   csrfToken: '',
+  selectedUids: new Set(),    // Multi-Select
+  searchQuery: '',            // Aktive Suche
+  isSearching: false,
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -66,6 +69,10 @@ const api = {
     api.post(`/api/reply/${encodeURIComponent(folder)}/${uid}`, { replyAll }),
   forward: (folder, uid) =>
     api.post(`/api/forward/${encodeURIComponent(folder)}/${uid}`),
+  search: (folder, query) =>
+    api.get(`/api/search/${encodeURIComponent(folder)}?q=${encodeURIComponent(query)}`),
+  deleteBulk: (folder, uids) =>
+    api.post(`/api/delete-bulk/${encodeURIComponent(folder)}`, { uids }),
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -301,6 +308,8 @@ async function loadMessages(folder) {
     }
 
     container.innerHTML = '';
+    state.selectedUids.clear();
+    updateBulkBar();
     const isGmail = document.documentElement.getAttribute('data-layout') === 'gmail';
 
     for (const msg of state.messages) {
@@ -314,8 +323,9 @@ async function loadMessages(folder) {
       const snippet = msg.snippet || '';
 
       if (isGmail) {
-        // Gmail-Layout: Eine Zeile – From | Subject - Snippet | Icons | Date
+        // Gmail-Layout: Checkbox + Star + From | Subject - Snippet | Icons | Date
         el.innerHTML = `
+          <input type="checkbox" class="msg-checkbox" data-uid="${msg.uid}">
           <span class="msg-star">${msg.flagged ? '★' : '☆'}</span>
           <span class="msg-from">${escapeHtml(fromName)}</span>
           <span class="msg-subject-line">
@@ -339,7 +349,11 @@ async function loadMessages(folder) {
         `;
       }
 
-      el.addEventListener('click', () => openMessage(msg.uid));
+      el.addEventListener('click', (e) => {
+        // Checkbox-Klick nicht als Mail-Öffnen behandeln
+        if (e.target.classList.contains('msg-checkbox')) return;
+        openMessage(msg.uid);
+      });
       container.appendChild(el);
     }
   } catch (err) {
@@ -989,7 +1003,182 @@ function isInputFocused() {
   return tag === 'input' || tag === 'textarea' || tag === 'select';
 }
 
-// ── Make global for inline onclick handlers ──
+// ═══════════════════════════════════════════════════════════
+//  CHECKBOX / MULTI-SELECT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('change', (e) => {
+  if (!e.target.classList.contains('msg-checkbox')) return;
+  const uid = parseInt(e.target.dataset.uid);
+  if (e.target.checked) {
+    state.selectedUids.add(uid);
+  } else {
+    state.selectedUids.delete(uid);
+  }
+  // Zeile visuell markieren
+  const row = e.target.closest('.message-item');
+  if (row) row.classList.toggle('selected', e.target.checked);
+  updateBulkBar();
+});
+
+function updateBulkBar() {
+  const bar = $('#bulk-actions');
+  const count = $('#bulk-count');
+  if (!bar) return;
+  if (state.selectedUids.size > 0) {
+    bar.hidden = false;
+    count.textContent = `${state.selectedUids.size} ausgewählt`;
+  } else {
+    bar.hidden = true;
+  }
+}
+
+// Bulk Actions
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action="bulk-delete"]');
+  if (btn && state.selectedUids.size > 0) {
+    handleBulkDelete();
+  }
+  const desel = e.target.closest('[data-action="bulk-deselect"]');
+  if (desel) {
+    state.selectedUids.clear();
+    $$('.msg-checkbox').forEach(cb => { cb.checked = false; });
+    $$('.message-item.selected').forEach(el => el.classList.remove('selected'));
+    updateBulkBar();
+  }
+});
+
+async function handleBulkDelete() {
+  const uids = [...state.selectedUids];
+  const count = uids.length;
+  try {
+    const result = await api.deleteBulk(state.currentFolder, uids);
+    if (result.success) {
+      showToast(`${count} Nachricht${count > 1 ? 'en' : ''} gelöscht`, 'success');
+      state.selectedUids.clear();
+      updateBulkBar();
+      loadMessages(state.currentFolder);
+    } else {
+      showToast(result.error || 'Löschen fehlgeschlagen', 'error');
+    }
+  } catch (err) {
+    showToast('Fehler: ' + err.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SEARCH
+// ═══════════════════════════════════════════════════════════
+(function initSearch() {
+  const input = $('#search-input');
+  const clearBtn = $('#search-clear');
+  if (!input) return;
+
+  let searchTimeout;
+
+  input.addEventListener('input', () => {
+    clearBtn.hidden = !input.value;
+    clearTimeout(searchTimeout);
+    if (input.value.length >= 2) {
+      searchTimeout = setTimeout(() => performSearch(input.value), 400);
+    } else if (input.value.length === 0) {
+      clearSearch();
+    }
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && input.value.length >= 2) {
+      clearTimeout(searchTimeout);
+      performSearch(input.value);
+    }
+    if (e.key === 'Escape') {
+      clearSearch();
+      input.blur();
+    }
+  });
+
+  clearBtn.addEventListener('click', () => {
+    clearSearch();
+  });
+})();
+
+async function performSearch(query) {
+  state.searchQuery = query;
+  state.isSearching = true;
+  const container = $('#message-list');
+  const folderName = $('#current-folder-name');
+
+  container.innerHTML = '<div class="loading-indicator">Suche…</div>';
+  folderName.textContent = `Suche: "${query}"`;
+
+  try {
+    const data = await api.search(state.currentFolder, query);
+    state.messages = data.messages || [];
+
+    if (state.messages.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>Keine Treffer</p></div>';
+      return;
+    }
+
+    // Reuse existing render logic
+    container.innerHTML = '';
+    state.selectedUids.clear();
+    updateBulkBar();
+    const isGmail = document.documentElement.getAttribute('data-layout') === 'gmail';
+
+    for (const msg of state.messages) {
+      const el = document.createElement('div');
+      el.className = `message-item${!msg.seen ? ' unread' : ''}`;
+      el.dataset.uid = msg.uid;
+
+      const fromName = msg.from?.[0]?.name || msg.from?.[0]?.address || 'Unbekannt';
+      const date = formatDate(msg.date);
+      const subject = msg.subject || '(Kein Betreff)';
+
+      if (isGmail) {
+        el.innerHTML = `
+          <input type="checkbox" class="msg-checkbox" data-uid="${msg.uid}">
+          <span class="msg-star">${msg.flagged ? '★' : '☆'}</span>
+          <span class="msg-from">${escapeHtml(fromName)}</span>
+          <span class="msg-subject-line">
+            <span class="msg-subject">${escapeHtml(subject)}</span>
+          </span>
+          <span class="msg-icons">${msg.hasAttachments ? '📎' : ''}</span>
+          <span class="msg-date">${date}</span>
+        `;
+      } else {
+        el.innerHTML = `
+          <div class="msg-top-row">
+            <span class="msg-from">${escapeHtml(fromName)}</span>
+            <span class="msg-date">${date}</span>
+          </div>
+          <div class="msg-subject">${escapeHtml(subject)}</div>
+        `;
+      }
+
+      el.addEventListener('click', (e) => {
+        if (e.target.classList.contains('msg-checkbox')) return;
+        openMessage(msg.uid);
+      });
+      container.appendChild(el);
+    }
+  } catch (err) {
+    container.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">Suche fehlgeschlagen: ${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+function clearSearch() {
+  const input = $('#search-input');
+  const clearBtn = $('#search-clear');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.hidden = true;
+  state.searchQuery = '';
+  state.isSearching = false;
+  if (state.connected) {
+    loadMessages(state.currentFolder);
+  }
+}
+
+// ── Make global ──
 window.closeDetail = closeDetail;
 window.openMessage = openMessage;
 window.handleReply = handleReply;

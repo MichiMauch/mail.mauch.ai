@@ -172,6 +172,84 @@ export class IMAPClient {
     }
   }
 
+  // ── IMAP SEARCH – Volltextsuche in Folder ───────────────────
+  async search(folder = 'INBOX', query, { count = 50 } = {}) {
+    this._ensureConnected();
+    const lock = await this.client.getMailboxLock(folder);
+    try {
+      // IMAP SEARCH mit OR für From/Subject/Body
+      const criteria = { or: [
+        { from: query },
+        { subject: query },
+        { body: query },
+      ]};
+
+      const uids = await this.client.search(criteria, { uid: true });
+      if (!uids || uids.length === 0) return [];
+
+      // Neueste zuerst, max count
+      const sortedUids = uids.sort((a, b) => b - a).slice(0, count);
+      const range = sortedUids.join(',');
+
+      const messages = [];
+      for await (const msg of this.client.fetch(range, {
+        uid: true,
+        flags: true,
+        envelope: true,
+        bodyStructure: true,
+        internalDate: true,
+      })) {
+        messages.push({
+          uid: msg.uid,
+          seq: msg.seq,
+          flags: [...msg.flags],
+          seen: msg.flags.has('\\Seen'),
+          flagged: msg.flags.has('\\Flagged'),
+          date: msg.envelope.date,
+          internalDate: msg.internalDate,
+          subject: msg.envelope.subject || '(Kein Betreff)',
+          from: this._formatAddresses(msg.envelope.from),
+          to: this._formatAddresses(msg.envelope.to),
+          cc: this._formatAddresses(msg.envelope.cc),
+          messageId: msg.envelope.messageId,
+          inReplyTo: msg.envelope.inReplyTo,
+          hasAttachments: this._detectAttachments(msg.bodyStructure),
+          bodyStructure: msg.bodyStructure,
+        });
+      }
+
+      messages.sort((a, b) => new Date(b.date) - new Date(a.date));
+      return messages;
+    } finally {
+      lock.release();
+    }
+  }
+
+  // ── Bulk Delete – Mehrere Nachrichten löschen ──────────────
+  async deleteMessages(folder, uids, trashFolder = null) {
+    this._ensureConnected();
+    if (!trashFolder) {
+      trashFolder = await this._findTrashFolder();
+    }
+
+    const uidRange = uids.join(',');
+    const lock = await this.client.getMailboxLock(folder);
+    try {
+      if (trashFolder && folder !== trashFolder) {
+        await this.client.messageMove(uidRange, trashFolder, { uid: true });
+        console.log(`[IMAP] ${uids.length} Nachrichten verschoben → ${trashFolder}`);
+        return { action: 'moved', count: uids.length, destination: trashFolder };
+      } else {
+        await this.client.messageFlagsAdd(uidRange, ['\\Deleted'], { uid: true });
+        await this.client.messageDelete(uidRange, { uid: true });
+        console.log(`[IMAP] ${uids.length} Nachrichten endgültig gelöscht`);
+        return { action: 'deleted', count: uids.length };
+      }
+    } finally {
+      lock.release();
+    }
+  }
+
   // ── Nachricht löschen (in Papierkorb verschieben) ───────────
   async deleteMessage(folder, uid, trashFolder = null) {
     this._ensureConnected();
