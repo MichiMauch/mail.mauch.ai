@@ -220,6 +220,36 @@ app.use((req, res, next) => {
   next();
 });
 
+// 1b) HTTP Basic Auth – vorgeschalteter Schutzlayer (optional)
+//     Aktiviert wenn BASIC_AUTH_USER + BASIC_AUTH_PASS gesetzt sind.
+//     Macht die gesamte App unsichtbar für unautorisierte Besucher.
+const BASIC_AUTH_USER = process.env.BASIC_AUTH_USER;
+const BASIC_AUTH_PASS = process.env.BASIC_AUTH_PASS;
+
+if (BASIC_AUTH_USER && BASIC_AUTH_PASS) {
+  app.use((req, res, next) => {
+    const authHeader = req.headers.authorization || '';
+    if (!authHeader.startsWith('Basic ')) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="Mail Client"');
+      return res.status(401).send('Authentifizierung erforderlich.');
+    }
+    const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8');
+    const [user, ...passParts] = decoded.split(':');
+    const pass = passParts.join(':'); // Passwort darf ":" enthalten
+    const passBuffer = Buffer.from(pass);
+    const expectedBuffer = Buffer.from(BASIC_AUTH_PASS);
+    const passMatch = passBuffer.length === expectedBuffer.length &&
+      crypto.timingSafeEqual(passBuffer, expectedBuffer);
+    if (user === BASIC_AUTH_USER && passMatch) {
+      return next();
+    }
+    securityLog.log('BASIC_AUTH_FAIL', { ip: req.ip, user });
+    res.setHeader('WWW-Authenticate', 'Basic realm="Mail Client"');
+    return res.status(401).send('Ungültige Zugangsdaten.');
+  });
+  console.log(`[BasicAuth] Vorgeschalteter Schutz aktiv (User: ${BASIC_AUTH_USER})`);
+}
+
 // 2) Helmet: Security-Header
 //    In Production: CSP mit Nonce statt unsafe-inline
 app.use((req, res, next) => {
