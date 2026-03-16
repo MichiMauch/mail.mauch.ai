@@ -89,6 +89,7 @@ function handleSessionExpired() {
   setTimeout(() => {
     $('#app-screen').classList.remove('active');
     $('#login-screen').classList.add('active');
+    resetAllLoadingButtons();
     closeCompose();
     closeDetail();
   }, 1000);
@@ -165,6 +166,20 @@ function closeSettings() {
     // Kein Problem – Felder bleiben sichtbar
   }
 })();
+
+// ═══════════════════════════════════════════════════════════
+//  GLOBAL: Alle Loading-Buttons zurücksetzen
+// ═══════════════════════════════════════════════════════════
+function resetAllLoadingButtons() {
+  $$('.btn-loading').forEach(el => { el.style.display = 'none'; });
+  $$('.btn-text').forEach(el => { el.style.display = ''; });
+  $$('button[disabled]').forEach(btn => {
+    // Nur Buttons mit Loading-Mechanismus resetten
+    if (btn.querySelector('.btn-loading')) btn.disabled = false;
+  });
+}
+// Sofort beim Laden alle Buttons zurücksetzen
+resetAllLoadingButtons();
 
 // ═══════════════════════════════════════════════════════════
 //  LOGIN
@@ -1086,6 +1101,7 @@ document.addEventListener('click', (e) => {
       state.smtpReady = false;
       $('#app-screen').classList.remove('active');
       $('#login-screen').classList.add('active');
+      resetAllLoadingButtons();
       closeCompose();
     });
   }
