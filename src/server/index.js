@@ -639,17 +639,26 @@ app.post('/api/connect', loginLimiter, async (req, res) => {
 
     let smtpClient = null;
     try {
+      console.log(`[SMTP] Verbinde mit ${finalSmtpHost}:${finalSmtpPort}...`);
       smtpClient = new SMTPClient();
-      await smtpClient.connect({
-        host: finalSmtpHost,
-        port: finalSmtpPort,
-        secure: true,
-        auth: authObj,
-        tls: {
-          rejectUnauthorized: process.env.TLS_REJECT_UNAUTHORIZED !== 'false',
-          minVersion: 'TLSv1.2',
-        },
-      });
+      // Timeout: max 10s für SMTP-Verbindung
+      const smtpTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('SMTP Timeout (10s)')), 10000)
+      );
+      await Promise.race([
+        smtpClient.connect({
+          host: finalSmtpHost,
+          port: finalSmtpPort,
+          secure: true,
+          auth: authObj,
+          tls: {
+            rejectUnauthorized: process.env.TLS_REJECT_UNAUTHORIZED !== 'false',
+            minVersion: 'TLSv1.2',
+          },
+        }),
+        smtpTimeout,
+      ]);
+      console.log(`[SMTP] Verbunden mit ${finalSmtpHost}:${finalSmtpPort}`);
     } catch (smtpErr) {
       console.warn(`[SMTP] Verbindung fehlgeschlagen: ${smtpErr.message}`);
       smtpClient = null;
