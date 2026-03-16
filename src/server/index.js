@@ -655,42 +655,25 @@ app.post('/api/connect', loginLimiter, async (req, res) => {
       smtpClient = null;
     }
 
-    // Session-Rotation + Verbindung registrieren
-    // regenerate() mit Fallback: bei MemoryStore kann regenerate fehlschlagen
-    const finishLogin = () => {
-      req.session.authenticated = true;
-      req.session.user = user;
-      req.session.lastActivity = Date.now();
-      req.session.csrfToken = crypto.randomBytes(16).toString('hex');
+    // Session Setup (ohne regenerate – MemoryStore-kompatibel)
+    req.session.authenticated = true;
+    req.session.user = user;
+    req.session.lastActivity = Date.now();
+    req.session.csrfToken = crypto.randomBytes(16).toString('hex');
 
-      // Verbindung an Session binden
-      setConnection(req.session.id, imapClient, smtpClient, user);
+    // Verbindung an Session binden
+    setConnection(req.session.id, imapClient, smtpClient, user);
 
-      securityLog.loginAttempt(user, req.ip, true);
-      console.log(`[Login] Session ${req.session.id.slice(0,8)}… für ${user}`);
+    securityLog.loginAttempt(user, req.ip, true);
+    console.log(`[Login] OK – Session ${req.session.id.slice(0,8)}… für ${user}`);
 
-      res.json({
-        success: true,
-        message: `Verbunden mit ${imapConfig.host}`,
-        smtpReady: !!smtpClient,
-        user,
-        csrfToken: req.session.csrfToken,
-      });
-    };
-
-    try {
-      await new Promise((resolve, reject) => {
-        req.session.regenerate((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-      finishLogin();
-    } catch (regenErr) {
-      console.warn('[Session] Regenerate failed, using existing session:', regenErr.message);
-      finishLogin();
-    }
-    return;
+    return res.json({
+      success: true,
+      message: `Verbunden mit ${imapConfig.host}`,
+      smtpReady: !!smtpClient,
+      user,
+      csrfToken: req.session.csrfToken,
+    });
   } catch (err) {
     const user = req.body?.user || 'unknown';
     securityLog.loginAttempt(user, req.ip, false, err.message);
