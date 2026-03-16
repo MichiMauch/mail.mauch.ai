@@ -1244,6 +1244,15 @@ input[type="number"] { width: 80px; }
   flex-shrink: 0;
 }
 
+.compose-from-display {
+  flex: 1;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 0.3rem 0;
+  user-select: all;
+}
+
 .compose-field input {
   flex: 1;
   background: transparent;

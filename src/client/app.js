@@ -869,7 +869,7 @@ function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '',
   overlay.classList.add('open');
 
   $('#compose-title').textContent = title;
-  $('#compose-from').value = state.user;
+  $('#compose-from').textContent = state.user;
   $('#compose-to').value = to;
   $('#compose-cc').value = cc;
   $('#compose-bcc').value = '';
@@ -927,7 +927,8 @@ function closeCompose() {
   const overlay = $('#compose-overlay');
   overlay.classList.remove('open');
   // Felder manuell zurücksetzen (kein <form> mehr)
-  ['#compose-from', '#compose-to', '#compose-cc', '#compose-bcc',
+  $('#compose-from').textContent = '';
+  ['#compose-to', '#compose-cc', '#compose-bcc',
    '#compose-subject', '#compose-body', '#compose-in-reply-to',
    '#compose-references'].forEach(sel => {
     const el = $(sel);
