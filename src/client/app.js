@@ -713,6 +713,9 @@ function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '',
   $('#compose-status').textContent = '';
   $('#compose-status').className = 'compose-status';
 
+  // Senden-Button zurücksetzen
+  setSendLoading(false);
+
   // AI-Kontext speichern
   state.composeContext = aiContext;
 
