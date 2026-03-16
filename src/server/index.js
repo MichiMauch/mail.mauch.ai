@@ -553,6 +553,90 @@ function stripHeaderInjection(str) {
   return str.replace(/[\r\n\x00]/g, '').trim();
 }
 
+// ── Threading: Messages nach Konversation gruppieren ───────
+function buildThreads(messages) {
+  // Map: messageId → message
+  const byMsgId = new Map();
+  for (const msg of messages) {
+    if (msg.messageId) byMsgId.set(msg.messageId, msg);
+  }
+
+  // Jede Message ihrem Thread zuordnen
+  const threadMap = new Map(); // threadId → [uids]
+  const msgToThread = new Map(); // uid → threadId
+
+  for (const msg of messages) {
+    // Suche den Thread über inReplyTo
+    let threadId = null;
+
+    if (msg.inReplyTo) {
+      const parent = byMsgId.get(msg.inReplyTo);
+      if (parent && msgToThread.has(parent.uid)) {
+        threadId = msgToThread.get(parent.uid);
+      }
+    }
+
+    // Suche Thread über Subject-Match (Fallback: "Re: xxx" → "xxx")
+    if (!threadId) {
+      const baseSubject = (msg.subject || '')
+        .replace(/^(Re|Fwd|Aw|Wg|Fw):\s*/gi, '')
+        .trim()
+        .toLowerCase();
+
+      if (baseSubject) {
+        for (const [tid, uids] of threadMap) {
+          const firstMsg = messages.find(m => m.uid === uids[0]);
+          if (firstMsg) {
+            const firstBase = (firstMsg.subject || '')
+              .replace(/^(Re|Fwd|Aw|Wg|Fw):\s*/gi, '')
+              .trim()
+              .toLowerCase();
+            if (firstBase === baseSubject) {
+              threadId = tid;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (threadId) {
+      threadMap.get(threadId).push(msg.uid);
+      msgToThread.set(msg.uid, threadId);
+    } else {
+      // Neuer Thread
+      const newThreadId = msg.messageId || `thread-${msg.uid}`;
+      threadMap.set(newThreadId, [msg.uid]);
+      msgToThread.set(msg.uid, newThreadId);
+    }
+  }
+
+  // Threads als Array zurückgeben (neueste zuerst, nach neuestem Message im Thread)
+  const threadList = [];
+  for (const [threadId, uids] of threadMap) {
+    const threadMsgs = uids.map(uid => messages.find(m => m.uid === uid)).filter(Boolean);
+    // Sortiere innerhalb des Threads: älteste zuerst
+    threadMsgs.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const newest = threadMsgs[threadMsgs.length - 1];
+    threadList.push({
+      id: threadId,
+      subject: (newest.subject || '').replace(/^(Re|Fwd|Aw|Wg|Fw):\s*/gi, '').trim() || '(Kein Betreff)',
+      count: threadMsgs.length,
+      uids: threadMsgs.map(m => m.uid),
+      newest: newest.date,
+      from: newest.from,
+      hasUnread: threadMsgs.some(m => !m.seen),
+      hasAttachments: threadMsgs.some(m => m.hasAttachments),
+      flagged: threadMsgs.some(m => m.flagged),
+      snippet: newest.snippet || '',
+    });
+  }
+
+  // Sortiere Threads: neueste zuerst
+  threadList.sort((a, b) => new Date(b.newest) - new Date(a.newest));
+  return threadList;
+}
+
 // ── Middleware: Session-IMAP-Verbindung sicherstellen ─────
 async function ensureConnection(req, res, next) {
   try {
@@ -727,7 +811,10 @@ app.get('/api/messages/:folder', requireAuth, ensureConnection, async (req, res)
     const since = req.query.since ? sanitizeString(req.query.since, 30) : null;
 
     const messages = await req.imap.fetchHeaders(folder, { count, since });
-    res.json({ folder, total: messages.length, messages });
+
+    // Threading: Messages nach Konversation gruppieren
+    const threads = buildThreads(messages);
+    res.json({ folder, total: messages.length, messages, threads });
   } catch (err) {
     res.status(500).json({ error: 'Nachrichten konnten nicht geladen werden', details: err.message });
   }

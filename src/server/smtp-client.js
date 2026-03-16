@@ -120,12 +120,34 @@ export class SMTPClient {
       originalMsg.messageId,
     ].filter(Boolean).join(' ');
 
-    // Zitierter Text
+    // Zitierter Text – Plaintext bevorzugt, Fallback: HTML→Text
     const date = originalMsg.date
       ? new Date(originalMsg.date).toLocaleString('de-DE')
       : '';
     const fromName = originalMsg.from?.[0]?.name || originalMsg.from?.[0]?.address || '';
-    const quotedText = (originalMsg.text || '')
+
+    let plainBody = originalMsg.text || '';
+    if (!plainBody.trim() && originalMsg.html) {
+      // HTML zu lesbarem Text konvertieren
+      plainBody = originalMsg.html
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n\n')
+        .replace(/<\/div>/gi, '\n')
+        .replace(/<\/li>/gi, '\n')
+        .replace(/<li[^>]*>/gi, '• ')
+        .replace(/<\/tr>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
+
+    const quotedText = plainBody
       .split('\n')
       .map(line => `> ${line}`)
       .join('\n');

@@ -1650,6 +1650,151 @@ input[type="number"] { width: 80px; }
 }
 
 /* ═══════════════════════════════════════════════════════
+   THREAD VIEW
+   ═══════════════════════════════════════════════════════ */
+
+.thread-count-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  margin-left: 0.5rem;
+}
+
+/* Thread: Collapsed Message Row */
+.thread-msg-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+  font-size: 0.82rem;
+}
+
+.thread-msg-collapsed:hover {
+  background: var(--bg-hover);
+}
+
+.thread-msg-from {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  min-width: 140px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thread-msg-snippet {
+  flex: 1;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-msg-date {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+/* Thread: Expanded Message */
+.thread-msg-expanded {
+  border-bottom: 1px solid var(--border);
+}
+
+.thread-msg-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  gap: 1rem;
+  font-size: 0.82rem;
+}
+
+.thread-msg-header strong {
+  color: var(--text-primary);
+}
+
+.thread-msg-to {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  margin-left: 0.5rem;
+}
+
+.thread-msg-body {
+  padding: 0 1.5rem 1rem;
+}
+
+.thread-msg-body .text-content {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  padding: 0;
+  margin: 0;
+}
+
+.thread-iframe {
+  width: 100%;
+  min-height: 150px;
+  border: none;
+  background: var(--bg-primary);
+}
+
+/* Thread Count Badge in message list */
+.msg-thread-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: var(--text-muted);
+  color: var(--bg-primary);
+  border-radius: 9px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* ── Gmail Thread Overrides ─────────────────────────── */
+[data-layout="gmail"] .thread-count-badge {
+  font-family: var(--gm-font);
+}
+
+[data-layout="gmail"] .thread-msg-collapsed {
+  padding: 10px 28px;
+  border-bottom: 1px solid var(--gm-outline);
+  font-family: var(--gm-font);
+}
+
+[data-layout="gmail"] .thread-msg-collapsed:hover {
+  background: var(--gm-hover);
+}
+
+[data-layout="gmail"] .thread-msg-expanded {
+  border-bottom: 1px solid var(--gm-outline);
+}
+
+[data-layout="gmail"] .thread-msg-header {
+  padding: 12px 28px;
+  font-family: var(--gm-font);
+}
+
+[data-layout="gmail"] .thread-msg-body {
+  padding: 0 28px 16px;
+}
+
+[data-layout="gmail"] .msg-thread-count {
+  background: var(--accent-dim, var(--text-muted));
+  color: var(--accent, var(--bg-primary));
+  font-family: var(--gm-font);
+}
+
+/* ═══════════════════════════════════════════════════════
    AI ASSIST
    ═══════════════════════════════════════════════════════ */
 

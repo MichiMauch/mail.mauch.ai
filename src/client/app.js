@@ -311,6 +311,7 @@ async function loadMessages(folder) {
   try {
     const data = await api.messages(folder);
     state.messages = data.messages || [];
+    state.threads = data.threads || [];
 
     if (state.messages.length === 0) {
       container.innerHTML = '<div class="empty-state"><p>Keine Nachrichten</p></div>';
@@ -322,49 +323,81 @@ async function loadMessages(folder) {
     updateBulkBar();
     const isGmail = document.documentElement.getAttribute('data-layout') === 'gmail';
 
-    for (const msg of state.messages) {
-      const el = document.createElement('div');
-      el.className = `message-item${!msg.seen ? ' unread' : ''}`;
-      el.dataset.uid = msg.uid;
+    // Gmail: Thread-basierte Ansicht
+    if (isGmail && state.threads.length > 0) {
+      for (const thread of state.threads) {
+        const el = document.createElement('div');
+        const newestUid = thread.uids[thread.uids.length - 1];
+        el.className = `message-item${thread.hasUnread ? ' unread' : ''}`;
+        el.dataset.uid = newestUid;
+        el.dataset.threadUids = thread.uids.join(',');
 
-      const fromName = msg.from?.[0]?.name || msg.from?.[0]?.address || 'Unbekannt';
-      const date = formatDate(msg.date);
-      const subject = msg.subject || '(Kein Betreff)';
-      const snippet = msg.snippet || '';
+        const fromName = thread.from?.[0]?.name || thread.from?.[0]?.address || 'Unbekannt';
+        const date = formatDate(thread.newest);
+        const subject = thread.subject || '(Kein Betreff)';
+        const countBadge = thread.count > 1 ? `<span class="msg-thread-count">${thread.count}</span>` : '';
 
-      if (isGmail) {
-        // Gmail-Layout: Checkbox + Star + From | Subject - Snippet | Icons | Date
         el.innerHTML = `
-          <input type="checkbox" class="msg-checkbox" data-uid="${msg.uid}">
-          <span class="msg-star">${msg.flagged ? '★' : '☆'}</span>
-          <span class="msg-from">${escapeHtml(fromName)}</span>
+          <input type="checkbox" class="msg-checkbox" data-uid="${newestUid}">
+          <span class="msg-star">${thread.flagged ? '★' : '☆'}</span>
+          <span class="msg-from">${escapeHtml(fromName)} ${countBadge}</span>
           <span class="msg-subject-line">
-            <span class="msg-subject">${escapeHtml(subject)}</span>${snippet ? `<span class="msg-snippet"> – ${escapeHtml(snippet)}</span>` : ''}
+            <span class="msg-subject">${escapeHtml(subject)}</span>${thread.snippet ? `<span class="msg-snippet"> – ${escapeHtml(thread.snippet)}</span>` : ''}
           </span>
-          <span class="msg-icons">${msg.hasAttachments ? '📎' : ''}</span>
+          <span class="msg-icons">${thread.hasAttachments ? '📎' : ''}</span>
           <span class="msg-date">${date}</span>
         `;
-      } else {
-        // Klassisches Layout
-        el.innerHTML = `
-          <div class="msg-top-row">
-            <span class="msg-from">${escapeHtml(fromName)}</span>
-            <span class="msg-date">${date}</span>
-          </div>
-          <div class="msg-subject">${escapeHtml(subject)}</div>
-          <div class="msg-indicators">
-            ${msg.hasAttachments ? '<span class="indicator attachment">📎</span>' : ''}
-            ${msg.flagged ? '<span class="indicator flagged">★</span>' : ''}
-          </div>
-        `;
-      }
 
-      el.addEventListener('click', (e) => {
-        // Checkbox-Klick nicht als Mail-Öffnen behandeln
-        if (e.target.classList.contains('msg-checkbox')) return;
-        openMessage(msg.uid);
-      });
-      container.appendChild(el);
+        el.addEventListener('click', (e) => {
+          if (e.target.classList.contains('msg-checkbox')) return;
+          // Thread mit mehreren Messages → zeige neueste, alle UIDs verfügbar
+          openMessage(newestUid, thread.uids);
+        });
+        container.appendChild(el);
+      }
+    } else {
+      // Classic-Layout oder kein Threading
+      for (const msg of state.messages) {
+        const el = document.createElement('div');
+        el.className = `message-item${!msg.seen ? ' unread' : ''}`;
+        el.dataset.uid = msg.uid;
+
+        const fromName = msg.from?.[0]?.name || msg.from?.[0]?.address || 'Unbekannt';
+        const date = formatDate(msg.date);
+        const subject = msg.subject || '(Kein Betreff)';
+        const snippet = msg.snippet || '';
+
+        if (isGmail) {
+          el.innerHTML = `
+            <input type="checkbox" class="msg-checkbox" data-uid="${msg.uid}">
+            <span class="msg-star">${msg.flagged ? '★' : '☆'}</span>
+            <span class="msg-from">${escapeHtml(fromName)}</span>
+            <span class="msg-subject-line">
+              <span class="msg-subject">${escapeHtml(subject)}</span>${snippet ? `<span class="msg-snippet"> – ${escapeHtml(snippet)}</span>` : ''}
+            </span>
+            <span class="msg-icons">${msg.hasAttachments ? '📎' : ''}</span>
+            <span class="msg-date">${date}</span>
+          `;
+        } else {
+          el.innerHTML = `
+            <div class="msg-top-row">
+              <span class="msg-from">${escapeHtml(fromName)}</span>
+              <span class="msg-date">${date}</span>
+            </div>
+            <div class="msg-subject">${escapeHtml(subject)}</div>
+            <div class="msg-indicators">
+              ${msg.hasAttachments ? '<span class="indicator attachment">📎</span>' : ''}
+              ${msg.flagged ? '<span class="indicator flagged">★</span>' : ''}
+            </div>
+          `;
+        }
+
+        el.addEventListener('click', (e) => {
+          if (e.target.classList.contains('msg-checkbox')) return;
+          openMessage(msg.uid);
+        });
+        container.appendChild(el);
+      }
     }
   } catch (err) {
     container.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">Fehler: ${escapeHtml(err.message)}</p></div>`;
@@ -374,8 +407,9 @@ async function loadMessages(folder) {
 // ═══════════════════════════════════════════════════════════
 //  NACHRICHT ÖFFNEN (Lazy Loading – Schicht 2+3+4)
 // ═══════════════════════════════════════════════════════════
-async function openMessage(uid, allowImages = false) {
+async function openMessage(uid, threadUids = null, allowImages = false) {
   state.currentUid = uid;
+  state.currentThreadUids = threadUids || [uid];
 
   // Aktive Nachricht markieren
   $$('.message-item').forEach(el => {
@@ -396,17 +430,135 @@ async function openMessage(uid, allowImages = false) {
   // Responsive: Detail anzeigen
   const layout = $('.app-layout');
   layout.classList.add('show-detail');
-  // Gmail-Layout: Liste ausblenden, Detail einblenden
   if (document.documentElement.getAttribute('data-layout') === 'gmail') {
     layout.classList.add('gmail-show-detail');
   }
 
   try {
-    const msg = await api.message(state.currentFolder, uid, allowImages);
-    renderMessage(msg, uid);
+    const isGmail = document.documentElement.getAttribute('data-layout') === 'gmail';
+
+    // Thread mit mehreren Messages → Konversations-Ansicht
+    if (isGmail && state.currentThreadUids.length > 1) {
+      await renderThread(state.currentThreadUids, allowImages);
+    } else {
+      const msg = await api.message(state.currentFolder, uid, allowImages);
+      renderMessage(msg, uid);
+    }
   } catch (err) {
     detailContent.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">Fehler: ${escapeHtml(err.message)}</p></div>`;
   }
+}
+
+async function renderThread(uids, allowImages = false) {
+  const detailContent = $('#detail-content');
+  const newestUid = uids[uids.length - 1];
+
+  // Lade alle Messages im Thread (älteste zuerst)
+  const messages = [];
+  for (const uid of uids) {
+    try {
+      const msg = await api.message(state.currentFolder, uid, allowImages);
+      messages.push({ ...msg, uid });
+    } catch { /* skip broken messages */ }
+  }
+
+  if (messages.length === 0) {
+    detailContent.innerHTML = '<div class="empty-state"><p>Thread konnte nicht geladen werden</p></div>';
+    return;
+  }
+
+  const newest = messages[messages.length - 1];
+  const subject = (newest.subject || '(Kein Betreff)').replace(/^(Re|Fwd|Aw|Wg|Fw):\s*/gi, '').trim();
+
+  let html = `
+    <div class="detail-header">
+      <button class="btn-icon btn-back" data-action="close-detail" title="Zurück">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
+      <div class="detail-meta">
+        <h2>${escapeHtml(subject)}</h2>
+        <span class="thread-count-badge">${messages.length} Nachrichten</span>
+      </div>
+    </div>
+  `;
+
+  // Ältere Messages collapsed, neueste expanded
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    const isNewest = i === messages.length - 1;
+    const fromStr = msg.from?.map(a => a.name || a.address).join(', ') || '–';
+    const dateStr = msg.date ? new Date(msg.date).toLocaleString('de-DE', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    }) : '–';
+
+    if (isNewest) {
+      // Neueste Message: voll anzeigen
+      html += renderThreadMessage(msg, msg.uid, true);
+    } else {
+      // Ältere Messages: collapsed
+      html += `
+        <div class="thread-msg-collapsed" data-action="expand-thread-msg" data-uid="${msg.uid}">
+          <span class="thread-msg-from">${escapeHtml(fromStr)}</span>
+          <span class="thread-msg-snippet">${escapeHtml((msg.text || '').slice(0, 100))}</span>
+          <span class="thread-msg-date">${dateStr}</span>
+        </div>
+      `;
+    }
+  }
+
+  // Reply-Actions für neueste Message
+  html += `
+    <div class="detail-reply-actions">
+      ${state.smtpReady ? `
+        <button class="btn-reply" data-action="reply" data-uid="${newestUid}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
+          Antworten
+        </button>
+        <button class="btn-reply" data-action="reply-all" data-uid="${newestUid}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 17 4 12 9 7"/><polyline points="15 17 10 12 15 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>
+          Allen antworten
+        </button>
+        <button class="btn-reply" data-action="forward" data-uid="${newestUid}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 014-4h12"/></svg>
+          Weiterleiten
+        </button>
+      ` : ''}
+      <button class="btn-reply btn-delete" data-action="delete" data-uid="${newestUid}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        Löschen
+      </button>
+    </div>
+  `;
+
+  detailContent.innerHTML = html;
+}
+
+function renderThreadMessage(msg, uid, expanded) {
+  const fromStr = msg.from?.map(a => a.name ? `${a.name} <${a.address}>` : a.address).join(', ') || '–';
+  const toStr = msg.to?.map(a => a.name ? `${a.name} <${a.address}>` : a.address).join(', ') || '–';
+  const dateStr = msg.date ? new Date(msg.date).toLocaleString('de-DE', {
+    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }) : '–';
+
+  let bodyHtml = '';
+  if (msg.html) {
+    bodyHtml = `<iframe class="mail-iframe thread-iframe" sandbox="allow-same-origin" srcdoc="${escapeHtml(msg.html)}"></iframe>`;
+  } else if (msg.text) {
+    bodyHtml = `<pre class="text-content">${escapeHtml(msg.text)}</pre>`;
+  }
+
+  return `
+    <div class="thread-msg-expanded" data-uid="${uid}">
+      <div class="thread-msg-header">
+        <div>
+          <strong>${escapeHtml(fromStr)}</strong>
+          <span class="thread-msg-to">an ${escapeHtml(toStr)}</span>
+        </div>
+        <span class="thread-msg-date">${dateStr}</span>
+      </div>
+      <div class="thread-msg-body">${bodyHtml}</div>
+    </div>
+  `;
 }
 
 function renderMessage(msg, uid) {
@@ -1042,6 +1194,23 @@ function isInputFocused() {
   const tag = document.activeElement?.tagName?.toLowerCase();
   return tag === 'input' || tag === 'textarea' || tag === 'select';
 }
+
+// ═══════════════════════════════════════════════════════════
+//  THREAD: EXPAND COLLAPSED MESSAGE
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('click', async (e) => {
+  const collapsed = e.target.closest('[data-action="expand-thread-msg"]');
+  if (!collapsed) return;
+  const uid = parseInt(collapsed.dataset.uid);
+  collapsed.innerHTML = '<span class="spinner" style="width:16px;height:16px"></span>';
+  try {
+    const msg = await api.message(state.currentFolder, uid);
+    const expandedHtml = renderThreadMessage(msg, uid, true);
+    collapsed.outerHTML = expandedHtml;
+  } catch (err) {
+    collapsed.innerHTML = `<span style="color:var(--danger)">Fehler: ${err.message}</span>`;
+  }
+});
 
 // ═══════════════════════════════════════════════════════════
 //  CHECKBOX / MULTI-SELECT
