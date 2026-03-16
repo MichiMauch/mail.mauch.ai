@@ -28,6 +28,7 @@ import { AttachmentSecurity } from './attachment-security.js';
 import { securityLog } from './security-logger.js';
 import { createClient as createRedisClient } from 'redis';
 import { RedisStore } from 'connect-redis';
+import { AIService } from './ai-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -49,6 +50,20 @@ const envConfig = {
   smtpHost: process.env.SMTP_HOST || null,
   smtpPort: parseInt(process.env.SMTP_PORT) || null,
 };
+
+// ── AI-Service (optional) ──────────────────────────────────
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
+let aiService = null;
+if (OPENAI_API_KEY) {
+  try {
+    aiService = new AIService(OPENAI_API_KEY);
+    console.log(`[AI] OpenAI aktiviert (Model: ${process.env.AI_MODEL || 'gpt-4o-mini'})`);
+  } catch (e) {
+    console.warn(`[AI] Initialisierung fehlgeschlagen: ${e.message}`);
+  }
+} else {
+  console.log('[AI] Deaktiviert (OPENAI_API_KEY nicht gesetzt)');
+}
 
 const PORT = parseInt(process.env.PORT) || config.server.port || 3000;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
@@ -932,6 +947,55 @@ app.post('/api/send', requireAuth, sendLimiter, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Senden fehlgeschlagen', details: err.message });
   }
+});
+
+// ── POST /api/ai/generate ──────────────────────────────────
+app.post('/api/ai/generate', requireAuth, async (req, res) => {
+  if (!aiService) {
+    return res.status(503).json({ error: 'AI-Funktion nicht verfügbar (OPENAI_API_KEY nicht konfiguriert).' });
+  }
+  try {
+    const { instructions, originalFrom, originalSubject, originalBody, mode } = req.body;
+
+    if (!instructions || !instructions.trim() || instructions.trim().length < 3) {
+      return res.status(400).json({ error: 'Bitte Anweisungen eingeben (mind. 3 Zeichen).' });
+    }
+
+    const safeInstructions = sanitizeString(instructions, 2000);
+    const safeFrom = sanitizeString(originalFrom || '', 200);
+    const safeSubject = sanitizeString(originalSubject || '', 500);
+    const safeBody = sanitizeString(originalBody || '', 5000);
+
+    // Username aus E-Mail extrahieren für Kontext
+    const userName = req.session.user?.split('@')[0] || '';
+
+    let generatedText;
+    if (mode === 'new') {
+      generatedText = await aiService.generateNew({
+        instructions: safeInstructions,
+        recipient: safeFrom,
+        userName,
+      });
+    } else {
+      generatedText = await aiService.generateReply({
+        originalFrom: safeFrom,
+        originalSubject: safeSubject,
+        originalBody: safeBody,
+        instructions: safeInstructions,
+        userName,
+      });
+    }
+
+    res.json({ success: true, text: generatedText });
+  } catch (err) {
+    console.error(`[AI] Fehler: ${err.message}`);
+    res.status(500).json({ error: 'AI-Generierung fehlgeschlagen', details: err.message });
+  }
+});
+
+// ── GET /api/ai/status ─────────────────────────────────────
+app.get('/api/ai/status', requireAuth, (req, res) => {
+  res.json({ available: !!aiService, model: aiService?.model || null });
 });
 
 // ── POST /api/reply/:folder/:uid ───────────────────────────

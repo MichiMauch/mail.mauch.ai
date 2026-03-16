@@ -380,6 +380,21 @@
             <button type="button" id="toggle-cc" class="btn-tiny-ghost" title="CC/BCC anzeigen">CC/BCC</button>
           </div>
         </div>
+        <!-- AI Assist -->
+        <div id="ai-assist" class="ai-assist" hidden>
+          <div class="ai-assist-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 014 4v1h2a2 2 0 012 2v1a3 3 0 01-3 3h-1v4a3 3 0 01-3 3h-2a3 3 0 01-3-3v-4H7a3 3 0 01-3-3V9a2 2 0 012-2h2V6a4 4 0 014-4z"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg>
+            <span>AI-Assistent</span>
+          </div>
+          <div class="ai-assist-body">
+            <input type="text" id="ai-instructions" class="ai-instructions" placeholder="z.B. «Frag nach dem Zwischenstand» oder «Sage freundlich ab»">
+            <button type="button" id="ai-generate-btn" class="btn-ai-generate" data-action="ai-generate">
+              <span class="btn-text">Generieren</span>
+              <span class="btn-loading" style="display:none"><span class="spinner"></span></span>
+            </button>
+          </div>
+        </div>
+
         <div class="compose-body-wrapper">
           <textarea id="compose-body" class="compose-body" placeholder="Nachricht schreiben…"></textarea>
         </div>

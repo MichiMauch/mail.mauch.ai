@@ -22,6 +22,8 @@ const state = {
   selectedUids: new Set(),    // Multi-Select
   searchQuery: '',            // Aktive Suche
   isSearching: false,
+  aiAvailable: false,         // AI-Funktion aktiv?
+  composeContext: null,       // Original-Mail-Kontext für AI
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -73,6 +75,8 @@ const api = {
     api.get(`/api/search/${encodeURIComponent(folder)}?q=${encodeURIComponent(query)}`),
   deleteBulk: (folder, uids) =>
     api.post(`/api/delete-bulk/${encodeURIComponent(folder)}`, { uids }),
+  aiStatus: () => api.get('/api/ai/status'),
+  aiGenerate: (data) => api.post('/api/ai/generate', data),
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -209,6 +213,12 @@ $('#login-form').addEventListener('submit', async (e) => {
     // Ordner + Nachrichten laden
     await loadFolders();
     await loadMessages('INBOX');
+
+    // AI-Status prüfen
+    try {
+      const aiStatus = await api.aiStatus();
+      state.aiAvailable = aiStatus.available || false;
+    } catch { state.aiAvailable = false; }
 
   } catch (err) {
     errorEl.textContent = err.message;
@@ -687,7 +697,7 @@ function showToast(message, type = 'info', duration = 3000) {
 //  COMPOSE / REPLY / FORWARD
 // ═══════════════════════════════════════════════════════════
 
-function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '', body = '', inReplyTo = '', references = '' } = {}) {
+function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '', body = '', inReplyTo = '', references = '', aiContext = null } = {}) {
   const overlay = $('#compose-overlay');
   overlay.classList.add('open');
 
@@ -703,6 +713,17 @@ function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '',
   $('#compose-status').textContent = '';
   $('#compose-status').className = 'compose-status';
 
+  // AI-Kontext speichern
+  state.composeContext = aiContext;
+
+  // AI-Assist ein-/ausblenden
+  const aiBlock = $('#ai-assist');
+  if (aiBlock) {
+    aiBlock.hidden = !state.aiAvailable;
+    const instrInput = $('#ai-instructions');
+    if (instrInput) instrInput.value = '';
+  }
+
   // CC anzeigen wenn vorausgefüllt
   const hasCc = cc.trim().length > 0;
   $('.compose-cc-field').hidden = !hasCc;
@@ -712,9 +733,10 @@ function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '',
 
   // Cursor ins richtige Feld setzen
   setTimeout(() => {
-    if (to) {
+    if (to && state.aiAvailable) {
+      $('#ai-instructions')?.focus();
+    } else if (to) {
       $('#compose-body').focus();
-      // Cursor an den Anfang setzen (vor dem zitierten Text)
       $('#compose-body').setSelectionRange(0, 0);
     } else {
       $('#compose-to').focus();
@@ -734,6 +756,9 @@ async function handleReply(uid, replyAll = false) {
     const data = await api.reply(state.currentFolder, uid, replyAll);
     if (data.error) throw new Error(data.details || data.error);
 
+    // Original-Mail-Daten für AI-Kontext finden
+    const origMsg = state.messages.find(m => m.uid === uid);
+
     openCompose({
       title: replyAll ? 'Allen antworten' : 'Antworten',
       to: data.to || '',
@@ -742,6 +767,12 @@ async function handleReply(uid, replyAll = false) {
       body: '\n' + (data.quotedText || ''),
       inReplyTo: data.inReplyTo || '',
       references: data.references || '',
+      aiContext: {
+        mode: 'reply',
+        originalFrom: origMsg?.from?.[0]?.name || origMsg?.from?.[0]?.address || data.to,
+        originalSubject: data.subject || '',
+        originalBody: data.quotedText?.replace(/^> /gm, '') || '',
+      },
     });
   } catch (err) {
     console.error('Reply-Fehler:', err);
@@ -762,6 +793,12 @@ async function handleForward(uid) {
       body: '\n' + (data.quotedText || ''),
       inReplyTo: '',
       references: '',
+      aiContext: {
+        mode: 'new',
+        originalFrom: '',
+        originalSubject: data.subject || '',
+        originalBody: data.quotedText || '',
+      },
     });
   } catch (err) {
     console.error('Forward-Fehler:', err);
@@ -1175,6 +1212,77 @@ function clearSearch() {
   state.isSearching = false;
   if (state.connected) {
     loadMessages(state.currentFolder);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AI GENERATE
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-action="ai-generate"]')) return;
+  handleAiGenerate();
+});
+
+// Enter in AI-Input = Generieren
+document.addEventListener('keydown', (e) => {
+  if (e.target.id === 'ai-instructions' && e.key === 'Enter') {
+    e.preventDefault();
+    handleAiGenerate();
+  }
+});
+
+async function handleAiGenerate() {
+  const input = $('#ai-instructions');
+  const btn = $('#ai-generate-btn');
+  const instructions = input?.value?.trim();
+
+  if (!instructions || instructions.length < 3) {
+    showToast('Bitte Anweisungen eingeben (mind. 3 Zeichen)', 'error');
+    input?.focus();
+    return;
+  }
+
+  // Loading-State
+  const btnText = btn.querySelector('.btn-text');
+  const btnLoading = btn.querySelector('.btn-loading');
+  btn.disabled = true;
+  btnText.style.display = 'none';
+  btnLoading.style.display = 'inline-flex';
+
+  try {
+    const ctx = state.composeContext || {};
+    const result = await api.aiGenerate({
+      instructions,
+      mode: ctx.mode || 'new',
+      originalFrom: ctx.originalFrom || '',
+      originalSubject: ctx.originalSubject || '',
+      originalBody: ctx.originalBody || '',
+    });
+
+    if (result.error) throw new Error(result.details || result.error);
+
+    // Generierten Text in den Body einsetzen (vor dem zitierten Text)
+    const body = $('#compose-body');
+    const existingText = body.value;
+    const quoteStart = existingText.indexOf('\n\nAm ');
+    const fwdStart = existingText.indexOf('\n\n---------- Weitergeleitete');
+
+    const splitPos = quoteStart > 0 ? quoteStart : (fwdStart > 0 ? fwdStart : -1);
+
+    if (splitPos > 0) {
+      body.value = result.text + existingText.slice(splitPos);
+    } else {
+      body.value = result.text;
+    }
+
+    showToast('AI-Antwort generiert ✓', 'success');
+    body.focus();
+  } catch (err) {
+    showToast('AI-Fehler: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btnText.style.display = '';
+    btnLoading.style.display = 'none';
   }
 }
 

@@ -1649,6 +1649,114 @@ input[type="number"] { width: 80px; }
   font-size: 0.78rem;
 }
 
+/* ═══════════════════════════════════════════════════════
+   AI ASSIST
+   ═══════════════════════════════════════════════════════ */
+
+.ai-assist[hidden] {
+  display: none !important;
+}
+
+.ai-assist {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+
+.ai-assist-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.ai-assist-header svg {
+  stroke: var(--accent);
+}
+
+.ai-assist-body {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 1rem 0.65rem;
+}
+
+.ai-instructions {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.ai-instructions:focus {
+  border-color: var(--accent);
+}
+
+.ai-instructions::placeholder {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.btn-ai-generate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--accent);
+  color: var(--bg-primary);
+  border: none;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.btn-ai-generate:hover {
+  opacity: 0.85;
+}
+
+.btn-ai-generate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Gmail-Layout Override */
+[data-layout="gmail"] .ai-assist {
+  border-bottom: none;
+  border-radius: 0;
+  background: var(--gm-surface-elevated, var(--bg-tertiary));
+}
+
+[data-layout="gmail"] .ai-assist-header {
+  font-family: var(--gm-font);
+  font-size: 0.72rem;
+}
+
+[data-layout="gmail"] .ai-instructions {
+  font-family: var(--gm-font);
+  border-radius: 20px;
+  padding: 0.55rem 1rem;
+}
+
+[data-layout="gmail"] .btn-ai-generate {
+  border-radius: 20px;
+  font-family: var(--gm-font);
+  padding: 0.55rem 1.25rem;
+}
+
 /* ── Compose Responsive ──────────────────────────────── */
 @media (max-width: 640px) {
   .compose-overlay { padding: 0; }

@@ -24,6 +24,7 @@
     "jsdom": "^24.1.1",
     "mailparser": "^3.7.1",
     "nodemailer": "^8.0.2",
+    "openai": "^6.29.0",
     "redis": "^5.11.0"
   }
 }
