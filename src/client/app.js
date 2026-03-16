@@ -871,12 +871,21 @@ function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '',
   // AI-Kontext speichern
   state.composeContext = aiContext;
 
-  // AI-Assist ein-/ausblenden
+  // AI-Assist ein-/ausblenden und Reset
   const aiBlock = $('#ai-assist');
   if (aiBlock) {
     aiBlock.hidden = !state.aiAvailable;
     const instrInput = $('#ai-instructions');
     if (instrInput) instrInput.value = '';
+    // AI-Button Reset
+    const aiBtn = $('#ai-generate-btn');
+    if (aiBtn) {
+      aiBtn.disabled = false;
+      const t = aiBtn.querySelector('.btn-text');
+      const l = aiBtn.querySelector('.btn-loading');
+      if (t) t.style.display = '';
+      if (l) l.style.display = 'none';
+    }
   }
 
   // CC anzeigen wenn vorausgefüllt

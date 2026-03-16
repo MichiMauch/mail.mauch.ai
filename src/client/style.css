@@ -303,7 +303,7 @@ a:hover { text-decoration: underline; }
 .login-subtitle {
   font-family: var(--font-display);
   font-size: 0.7rem;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   letter-spacing: 0.15em;
   text-transform: uppercase;
   margin-top: 0.5rem;
@@ -331,10 +331,11 @@ a:hover { text-decoration: underline; }
 label {
   font-family: var(--font-display);
   font-size: 0.65rem;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  opacity: 0.7;
 }
 
 input[type="text"],
@@ -763,10 +764,11 @@ input[type="number"] { width: 80px; }
 .detail-addresses .label {
   font-family: var(--font-display);
   font-size: 0.6rem;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-primary);
+  opacity: 0.55;
   margin-right: 0.35rem;
 }
 
@@ -840,7 +842,7 @@ input[type="number"] { width: 80px; }
   gap: 0.4rem;
   font-family: var(--font-display);
   font-size: 0.65rem;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   margin-bottom: 0.5rem;
@@ -1227,11 +1229,12 @@ input[type="number"] { width: 80px; }
 
 .compose-field label {
   font-family: var(--font-display);
-  font-size: 0.6rem;
-  font-weight: 500;
+  font-size: 0.65rem;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-primary);
+  opacity: 0.65;
   width: 42px;
   flex-shrink: 0;
 }
@@ -1248,7 +1251,8 @@ input[type="number"] { width: 80px; }
 }
 
 .compose-field input::placeholder {
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
 .compose-field input:read-only {
@@ -1848,7 +1852,8 @@ input[type="number"] { width: 80px; }
 }
 
 .ai-instructions::placeholder {
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  opacity: 0.6;
   font-size: 0.75rem;
 }
 
