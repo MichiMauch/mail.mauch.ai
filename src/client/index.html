@@ -29,7 +29,7 @@
         <p class="login-subtitle">Minimalistischer IMAP-Client</p>
       </div>
 
-      <form id="login-form" class="login-form">
+      <form id="login-form" class="login-form" autocomplete="off">
         <div class="form-group" id="host-group">
           <label for="host">IMAP Server</label>
           <input type="text" id="host" placeholder="imap.gmail.com">
@@ -42,11 +42,11 @@
         </div>
         <div class="form-group">
           <label for="user">E-Mail</label>
-          <input type="email" id="user" placeholder="name@example.com" required>
+          <input type="text" id="user" inputmode="email" autocomplete="username" placeholder="name@example.com" required>
         </div>
         <div class="form-group">
           <label for="pass">Passwort / App-Passwort</label>
-          <input type="password" id="pass" placeholder="••••••••" required>
+          <input type="password" id="pass" autocomplete="current-password" placeholder="••••••••" required>
         </div>
         <details class="smtp-details">
           <summary>SMTP-Einstellungen (optional)</summary>
@@ -354,22 +354,22 @@
         </div>
       </div>
 
-      <form id="compose-form" class="compose-form">
+      <form id="compose-form" class="compose-form" autocomplete="off">
         <div class="compose-field">
           <label for="compose-from">Von</label>
-          <input type="text" id="compose-from" name="from" autocomplete="off" readonly>
+          <input type="text" id="compose-from" name="compose_sender" autocomplete="off" data-lpignore="true" data-1p-ignore readonly>
         </div>
         <div class="compose-field">
           <label for="compose-to">An</label>
-          <input type="text" id="compose-to" name="to" autocomplete="off" placeholder="empfaenger@example.com" required>
+          <input type="search" id="compose-to" name="compose_recipient" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="empfaenger@example.com" required>
         </div>
         <div class="compose-field compose-cc-field" hidden>
           <label for="compose-cc">CC</label>
-          <input type="text" id="compose-cc" name="cc" autocomplete="off" placeholder="cc@example.com">
+          <input type="search" id="compose-cc" name="compose_carbon" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="cc@example.com">
         </div>
         <div class="compose-field compose-bcc-field" hidden>
           <label for="compose-bcc">BCC</label>
-          <input type="text" id="compose-bcc" name="bcc" autocomplete="off" placeholder="bcc@example.com">
+          <input type="search" id="compose-bcc" name="compose_blind" autocomplete="off" data-lpignore="true" data-1p-ignore placeholder="bcc@example.com">
         </div>
         <div class="compose-field-row">
           <div class="compose-field flex-grow">

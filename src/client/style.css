@@ -1248,6 +1248,15 @@ input[type="number"] { width: 80px; }
   font-size: 0.85rem;
   padding: 0.3rem 0;
   outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* type="search" Reset – kein Lupen-Icon */
+.compose-field input[type="search"]::-webkit-search-decoration,
+.compose-field input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .compose-field input::placeholder {
