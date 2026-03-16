@@ -926,8 +926,13 @@ function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '',
 function closeCompose() {
   const overlay = $('#compose-overlay');
   overlay.classList.remove('open');
-  // Formular zurücksetzen
-  $('#compose-form').reset();
+  // Felder manuell zurücksetzen (kein <form> mehr)
+  ['#compose-from', '#compose-to', '#compose-cc', '#compose-bcc',
+   '#compose-subject', '#compose-body', '#compose-in-reply-to',
+   '#compose-references'].forEach(sel => {
+    const el = $(sel);
+    if (el) el.value = '';
+  });
 }
 
 async function handleReply(uid, replyAll = false) {
@@ -1164,8 +1169,8 @@ document.addEventListener('click', (e) => {
 });
 
 // Compose: Senden
-$('#compose-form').addEventListener('submit', (e) => {
-  e.preventDefault();
+// Senden-Button (kein <form> mehr, daher click statt submit)
+$('#compose-send-btn').addEventListener('click', () => {
   sendMail();
 });
 
