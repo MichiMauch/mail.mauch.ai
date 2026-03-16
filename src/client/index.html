@@ -356,20 +356,20 @@
 
       <form id="compose-form" class="compose-form">
         <div class="compose-field">
-          <label>Von</label>
-          <input type="text" id="compose-from" readonly>
+          <label for="compose-from">Von</label>
+          <input type="text" id="compose-from" name="from" autocomplete="off" readonly>
         </div>
         <div class="compose-field">
-          <label>An</label>
-          <input type="text" id="compose-to" placeholder="empfaenger@example.com" required>
+          <label for="compose-to">An</label>
+          <input type="text" id="compose-to" name="to" autocomplete="off" placeholder="empfaenger@example.com" required>
         </div>
         <div class="compose-field compose-cc-field" hidden>
-          <label>CC</label>
-          <input type="text" id="compose-cc" placeholder="cc@example.com">
+          <label for="compose-cc">CC</label>
+          <input type="text" id="compose-cc" name="cc" autocomplete="off" placeholder="cc@example.com">
         </div>
         <div class="compose-field compose-bcc-field" hidden>
-          <label>BCC</label>
-          <input type="text" id="compose-bcc" placeholder="bcc@example.com">
+          <label for="compose-bcc">BCC</label>
+          <input type="text" id="compose-bcc" name="bcc" autocomplete="off" placeholder="bcc@example.com">
         </div>
         <div class="compose-field-row">
           <div class="compose-field flex-grow">
