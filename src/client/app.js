@@ -1175,6 +1175,42 @@ $('#compose-send-btn').addEventListener('click', () => {
   sendMail();
 });
 
+// ── Autofill-Schutz: Verhindert dass Browser alle Felder gleichzeitig befüllt ──
+(function initAutofillGuard() {
+  const fields = ['#compose-to', '#compose-cc', '#compose-bcc', '#compose-subject'];
+  const saved = {};
+
+  // Werte speichern wenn ein Feld fokussiert wird
+  function snapshot() {
+    fields.forEach(sel => {
+      const el = $(sel);
+      if (el) saved[sel] = el.value;
+    });
+  }
+
+  fields.forEach(sel => {
+    const el = $(sel);
+    if (!el) return;
+
+    el.addEventListener('focus', snapshot);
+
+    el.addEventListener('input', () => {
+      const focused = document.activeElement;
+      // Alle NICHT-fokussierten Felder auf gespeicherten Wert zurücksetzen
+      fields.forEach(other => {
+        const otherEl = $(other);
+        if (otherEl && otherEl !== focused && saved[other] !== undefined) {
+          if (otherEl.value !== saved[other]) {
+            otherEl.value = saved[other];
+          }
+        }
+      });
+      // Neuen Snapshot machen
+      snapshot();
+    });
+  });
+})();
+
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
   // Escape: Detail schließen oder Compose schließen
