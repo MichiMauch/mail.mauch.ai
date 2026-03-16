@@ -656,9 +656,8 @@ app.post('/api/connect', loginLimiter, async (req, res) => {
     }
 
     // Session-Rotation + Verbindung registrieren
-    req.session.regenerate((err) => {
-      if (err) console.warn('[Session] Regenerate failed:', err.message);
-
+    // regenerate() mit Fallback: bei MemoryStore kann regenerate fehlschlagen
+    const finishLogin = () => {
       req.session.authenticated = true;
       req.session.user = user;
       req.session.lastActivity = Date.now();
@@ -668,6 +667,7 @@ app.post('/api/connect', loginLimiter, async (req, res) => {
       setConnection(req.session.id, imapClient, smtpClient, user);
 
       securityLog.loginAttempt(user, req.ip, true);
+      console.log(`[Login] Session ${req.session.id.slice(0,8)}… für ${user}`);
 
       res.json({
         success: true,
@@ -676,7 +676,20 @@ app.post('/api/connect', loginLimiter, async (req, res) => {
         user,
         csrfToken: req.session.csrfToken,
       });
-    });
+    };
+
+    try {
+      await new Promise((resolve, reject) => {
+        req.session.regenerate((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      finishLogin();
+    } catch (regenErr) {
+      console.warn('[Session] Regenerate failed, using existing session:', regenErr.message);
+      finishLogin();
+    }
     return;
   } catch (err) {
     const user = req.body?.user || 'unknown';
