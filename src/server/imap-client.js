@@ -323,6 +323,77 @@ export class IMAPClient {
     return result;
   }
 
+  // ── Thread-Nachrichten aus Sent-Ordner laden ───────────────
+  async fetchSentThreadMessages(messageIds) {
+    this._ensureConnected();
+    const sentFolder = await this._findSentFolder();
+    if (!sentFolder || !messageIds || messageIds.length === 0) return [];
+
+    const lock = await this.client.getMailboxLock(sentFolder);
+    try {
+      // Sammle UIDs aller Sent-Nachrichten die auf eine der messageIds antworten
+      const allUids = new Set();
+      for (const msgId of messageIds) {
+        try {
+          const uids = await this.client.search(
+            { header: { 'In-Reply-To': msgId } },
+            { uid: true }
+          );
+          if (uids) uids.forEach(uid => allUids.add(uid));
+        } catch { /* skip search errors */ }
+      }
+
+      // Auch Nachrichten suchen deren messageId in den References vorkommt
+      // (für den Fall dass die gesendete Nachricht der Thread-Starter ist)
+      for (const msgId of messageIds) {
+        try {
+          const uids = await this.client.search(
+            { header: { 'Message-ID': msgId } },
+            { uid: true }
+          );
+          if (uids) uids.forEach(uid => allUids.add(uid));
+        } catch { /* skip */ }
+      }
+
+      if (allUids.size === 0) return [];
+
+      const range = [...allUids].join(',');
+      const messages = [];
+      for await (const msg of this.client.fetch(range, {
+        uid: true,
+        flags: true,
+        envelope: true,
+        bodyStructure: true,
+        internalDate: true,
+      })) {
+        messages.push({
+          uid: msg.uid,
+          folder: sentFolder,
+          seq: msg.seq,
+          flags: [...msg.flags],
+          seen: msg.flags.has('\\Seen'),
+          flagged: msg.flags.has('\\Flagged'),
+          date: msg.envelope.date,
+          internalDate: msg.internalDate,
+          subject: msg.envelope.subject || '(Kein Betreff)',
+          from: this._formatAddresses(msg.envelope.from),
+          to: this._formatAddresses(msg.envelope.to),
+          cc: this._formatAddresses(msg.envelope.cc),
+          messageId: msg.envelope.messageId,
+          inReplyTo: msg.envelope.inReplyTo,
+          hasAttachments: this._detectAttachments(msg.bodyStructure),
+          bodyStructure: msg.bodyStructure,
+          isSent: true,
+        });
+      }
+
+      messages.sort((a, b) => new Date(a.date) - new Date(b.date));
+      return messages;
+    } finally {
+      lock.release();
+    }
+  }
+
   // ── Verbindung trennen ─────────────────────────────────────
   async disconnect() {
     if (this.client) {

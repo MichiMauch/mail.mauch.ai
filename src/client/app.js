@@ -75,6 +75,7 @@ const api = {
     api.get(`/api/search/${encodeURIComponent(folder)}?q=${encodeURIComponent(query)}`),
   deleteBulk: (folder, uids) =>
     api.post(`/api/delete-bulk/${encodeURIComponent(folder)}`, { uids }),
+  threadSent: (messageIds) => api.post('/api/thread-sent', { messageIds }),
   aiStatus: () => api.get('/api/ai/status'),
   aiGenerate: (data) => api.post('/api/ai/generate', data),
 };
@@ -475,8 +476,8 @@ async function openMessage(uid, threadUids = null, allowImages = false) {
   try {
     const isGmail = document.documentElement.getAttribute('data-layout') === 'gmail';
 
-    // Thread mit mehreren Messages → Konversations-Ansicht
-    if (isGmail && state.currentThreadUids.length > 1) {
+    // Gmail-Layout: immer Thread-Ansicht (auch für einzelne Nachrichten, wegen Sent-Antworten)
+    if (isGmail) {
       await renderThread(state.currentThreadUids, allowImages);
     } else {
       const msg = await api.message(state.currentFolder, uid, allowImages);
@@ -496,13 +497,38 @@ async function renderThread(uids, allowImages = false) {
   for (const uid of uids) {
     try {
       const msg = await api.message(state.currentFolder, uid, allowImages);
-      messages.push({ ...msg, uid });
+      messages.push({ ...msg, uid, folder: state.currentFolder });
     } catch { /* skip broken messages */ }
   }
 
   if (messages.length === 0) {
     detailContent.innerHTML = '<div class="empty-state"><p>Thread konnte nicht geladen werden</p></div>';
     return;
+  }
+
+  // Sent-Antworten laden und in den Thread einfügen
+  if (!isSentFolder()) {
+    try {
+      const messageIds = messages.map(m => m.messageId).filter(Boolean);
+      if (messageIds.length > 0) {
+        const sentResult = await api.threadSent(messageIds);
+        if (sentResult.messages?.length > 0) {
+          // Duplikate vermeiden (gleiche messageId)
+          const existingIds = new Set(messages.map(m => m.messageId).filter(Boolean));
+          for (const sentMsg of sentResult.messages) {
+            if (!existingIds.has(sentMsg.messageId)) {
+              // Vollständige Nachricht aus Sent-Ordner laden
+              try {
+                const fullMsg = await api.message(sentMsg.folder, sentMsg.uid, allowImages);
+                messages.push({ ...fullMsg, uid: sentMsg.uid, folder: sentMsg.folder, isSent: true });
+              } catch { /* skip */ }
+            }
+          }
+          // Chronologisch sortieren
+          messages.sort((a, b) => new Date(a.date) - new Date(b.date));
+        }
+      }
+    } catch { /* Sent-Laden fehlgeschlagen, Thread trotzdem anzeigen */ }
   }
 
   const newest = messages[messages.length - 1];
@@ -524,19 +550,20 @@ async function renderThread(uids, allowImages = false) {
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
     const isNewest = i === messages.length - 1;
-    const fromStr = msg.from?.map(a => a.name || a.address).join(', ') || '–';
+    const isSent = msg.isSent;
+    const displayName = isSent
+      ? ('An: ' + (msg.to?.map(a => a.name || a.address).join(', ') || '–'))
+      : (msg.from?.map(a => a.name || a.address).join(', ') || '–');
     const dateStr = msg.date ? new Date(msg.date).toLocaleString('de-DE', {
       day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
     }) : '–';
 
     if (isNewest) {
-      // Neueste Message: voll anzeigen
       html += renderThreadMessage(msg, msg.uid, true);
     } else {
-      // Ältere Messages: collapsed
       html += `
-        <div class="thread-msg-collapsed" data-action="expand-thread-msg" data-uid="${msg.uid}">
-          <span class="thread-msg-from">${escapeHtml(fromStr)}</span>
+        <div class="thread-msg-collapsed${isSent ? ' thread-msg-sent' : ''}" data-action="expand-thread-msg" data-uid="${msg.uid}" ${msg.folder ? `data-folder="${escapeHtml(msg.folder)}"` : ''}>
+          <span class="thread-msg-from">${escapeHtml(displayName)}</span>
           <span class="thread-msg-snippet">${escapeHtml((msg.text || '').slice(0, 100))}</span>
           <span class="thread-msg-date">${dateStr}</span>
         </div>
@@ -1294,7 +1321,8 @@ document.addEventListener('click', async (e) => {
   const uid = parseInt(collapsed.dataset.uid);
   collapsed.innerHTML = '<span class="spinner" style="width:16px;height:16px"></span>';
   try {
-    const msg = await api.message(state.currentFolder, uid);
+    const folder = collapsed.dataset.folder || state.currentFolder;
+    const msg = await api.message(folder, uid);
     const expandedHtml = renderThreadMessage(msg, uid, true);
     collapsed.outerHTML = expandedHtml;
   } catch (err) {

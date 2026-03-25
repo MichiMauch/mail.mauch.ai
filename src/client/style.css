@@ -1691,6 +1691,11 @@ input[type="number"] { width: 80px; }
   background: var(--bg-hover);
 }
 
+.thread-msg-sent .thread-msg-from {
+  font-style: italic;
+  color: var(--accent, #1a73e8);
+}
+
 .thread-msg-from {
   font-weight: 600;
   color: var(--text-primary);

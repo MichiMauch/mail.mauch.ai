@@ -959,6 +959,26 @@ app.get('/api/message/:folder/:uid', requireAuth, ensureConnection, async (req, 
   }
 });
 
+// ── POST /api/thread-sent ─────────────────────────────────
+// Lädt gesendete Antworten die zum Thread gehören (via messageIds)
+app.post('/api/thread-sent', requireAuth, ensureConnection, async (req, res) => {
+  try {
+    const { messageIds } = req.body;
+    if (!Array.isArray(messageIds) || messageIds.length === 0) {
+      return res.json({ messages: [] });
+    }
+
+    // Max 50 messageIds um Missbrauch zu vermeiden
+    const ids = messageIds.slice(0, 50).filter(id => typeof id === 'string' && id.length < 500);
+    if (ids.length === 0) return res.json({ messages: [] });
+
+    const sentMessages = await req.imap.fetchSentThreadMessages(ids);
+    res.json({ messages: sentMessages });
+  } catch (err) {
+    res.status(500).json({ error: 'Thread-Nachrichten konnten nicht geladen werden', details: err.message });
+  }
+});
+
 // ── GET /api/attachment/:token ─────────────────────────────
 app.get('/api/attachment/:token', requireAuth, ensureConnection, async (req, res) => {
   try {
