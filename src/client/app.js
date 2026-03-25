@@ -285,6 +285,14 @@ function isSentFolder() {
   return name.includes('sent') || name === 'gesendet' || name.includes('gesendete');
 }
 
+function isDraftsFolder() {
+  const folder = state.folders.find(f => f.path === state.currentFolder);
+  if (!folder) return false;
+  if (folder.specialUse === '\\Drafts') return true;
+  const name = folder.name.toLowerCase();
+  return name.includes('draft') || name.includes('entwürf') || name === 'entwurf';
+}
+
 function getFolderIcon(folder) {
   if (folder.specialUse) {
     return FOLDER_ICONS[folder.specialUse] || '▪';
@@ -479,6 +487,28 @@ async function openMessage(uid, threadUids = null, allowImages = false) {
   }
 
   try {
+    // Drafts-Ordner: Entwurf zum Weiterbearbeiten im Compose öffnen
+    if (isDraftsFolder()) {
+      const msg = await api.message(state.currentFolder, uid, false);
+      const formatAddrs = (addrs) => (addrs || []).map(a => a.name ? `${a.name} <${a.address}>` : a.address).join(', ');
+      state.currentDraftUid = uid;
+      state.draftFolder = state.currentFolder;
+      openCompose({
+        title: 'Entwurf bearbeiten',
+        to: formatAddrs(msg.to),
+        cc: formatAddrs(msg.cc),
+        subject: (msg.subject || '').replace(/^\(Kein Betreff\)$/, ''),
+        body: msg.text || '',
+        inReplyTo: msg.inReplyTo || '',
+        references: msg.references || '',
+      });
+      // Detail-Bereich zurücksetzen
+      detailContent.innerHTML = '';
+      section.classList.remove('has-message');
+      layout.classList.remove('show-detail', 'gmail-show-detail');
+      return;
+    }
+
     const isGmail = document.documentElement.getAttribute('data-layout') === 'gmail';
 
     // Gmail-Layout: immer Thread-Ansicht (auch für einzelne Nachrichten, wegen Sent-Antworten)
