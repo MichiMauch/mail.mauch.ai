@@ -625,6 +625,7 @@ function buildThreads(messages) {
       uids: threadMsgs.map(m => m.uid),
       newest: newest.date,
       from: newest.from,
+      to: newest.to,
       hasUnread: threadMsgs.some(m => !m.seen),
       hasAttachments: threadMsgs.some(m => m.hasAttachments),
       flagged: threadMsgs.some(m => m.flagged),

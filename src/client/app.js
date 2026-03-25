@@ -260,6 +260,14 @@ const FOLDER_ICONS = {
   '\\Important': '!',
 };
 
+function isSentFolder() {
+  const folder = state.folders.find(f => f.path === state.currentFolder);
+  if (!folder) return false;
+  if (folder.specialUse === '\\Sent') return true;
+  const name = folder.name.toLowerCase();
+  return name.includes('sent') || name === 'gesendet' || name.includes('gesendete');
+}
+
 function getFolderIcon(folder) {
   if (folder.specialUse) {
     return FOLDER_ICONS[folder.specialUse] || '▪';
@@ -347,7 +355,9 @@ async function loadMessages(folder) {
         el.dataset.uid = newestUid;
         el.dataset.threadUids = thread.uids.join(',');
 
-        const fromName = thread.from?.[0]?.name || thread.from?.[0]?.address || 'Unbekannt';
+        const fromName = isSentFolder()
+          ? (thread.to?.[0]?.name || thread.to?.[0]?.address || 'Unbekannt')
+          : (thread.from?.[0]?.name || thread.from?.[0]?.address || 'Unbekannt');
         const date = formatDate(thread.newest);
         const subject = thread.subject || '(Kein Betreff)';
         const countBadge = thread.count > 1 ? `<span class="msg-thread-count">${thread.count}</span>` : '';
@@ -377,7 +387,9 @@ async function loadMessages(folder) {
         el.className = `message-item${!msg.seen ? ' unread' : ''}`;
         el.dataset.uid = msg.uid;
 
-        const fromName = msg.from?.[0]?.name || msg.from?.[0]?.address || 'Unbekannt';
+        const fromName = isSentFolder()
+          ? (msg.to?.[0]?.name || msg.to?.[0]?.address || 'Unbekannt')
+          : (msg.from?.[0]?.name || msg.from?.[0]?.address || 'Unbekannt');
         const date = formatDate(msg.date);
         const subject = msg.subject || '(Kein Betreff)';
         const snippet = msg.snippet || '';
@@ -1406,7 +1418,9 @@ async function performSearch(query) {
       el.className = `message-item${!msg.seen ? ' unread' : ''}`;
       el.dataset.uid = msg.uid;
 
-      const fromName = msg.from?.[0]?.name || msg.from?.[0]?.address || 'Unbekannt';
+      const fromName = isSentFolder()
+        ? (msg.to?.[0]?.name || msg.to?.[0]?.address || 'Unbekannt')
+        : (msg.from?.[0]?.name || msg.from?.[0]?.address || 'Unbekannt');
       const date = formatDate(msg.date);
       const subject = msg.subject || '(Kein Betreff)';
 
