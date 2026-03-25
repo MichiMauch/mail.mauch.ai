@@ -182,8 +182,44 @@ function resetAllLoadingButtons() {
 resetAllLoadingButtons();
 
 // ═══════════════════════════════════════════════════════════
-//  LOGIN
+//  SESSION-RESTORE + LOGIN
 // ═══════════════════════════════════════════════════════════
+async function enterApp(result, user) {
+  state.connected = true;
+  state.smtpReady = result.smtpReady || false;
+  state.user = user;
+  state.csrfToken = result.csrfToken || '';
+  $('#connection-info').textContent = state.user;
+
+  const composeBtn = $('#compose-btn');
+  if (composeBtn) {
+    composeBtn.disabled = !state.smtpReady;
+    composeBtn.title = state.smtpReady ? 'Neue E-Mail' : 'SMTP nicht verbunden';
+  }
+
+  $('#login-screen').classList.remove('active');
+  $('#app-screen').classList.add('active');
+
+  await loadFolders();
+  await loadMessages('INBOX');
+
+  try {
+    const aiStatus = await api.aiStatus();
+    state.aiAvailable = aiStatus.available || false;
+  } catch { state.aiAvailable = false; }
+}
+
+// Session-Restore beim Laden
+(async function checkSession() {
+  try {
+    const result = await api.get('/api/status');
+    if (result.success) {
+      await enterApp(result, result.user);
+    }
+  } catch {
+    // Keine gültige Session → Login-Screen bleibt sichtbar
+  }
+})();
 $('#login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = $('#login-btn');
@@ -208,32 +244,7 @@ $('#login-form').addEventListener('submit', async (e) => {
 
     if (result.error) throw new Error(result.details || result.error);
 
-    state.connected = true;
-    state.smtpReady = result.smtpReady || false;
-    state.user = $('#user').value.trim();
-    state.csrfToken = result.csrfToken || '';
-    $('#connection-info').textContent = state.user;
-
-    // Compose-Button aktivieren/deaktivieren
-    const composeBtn = $('#compose-btn');
-    if (composeBtn) {
-      composeBtn.disabled = !state.smtpReady;
-      composeBtn.title = state.smtpReady ? 'Neue E-Mail' : 'SMTP nicht verbunden';
-    }
-
-    // UI umschalten
-    $('#login-screen').classList.remove('active');
-    $('#app-screen').classList.add('active');
-
-    // Ordner + Nachrichten laden
-    await loadFolders();
-    await loadMessages('INBOX');
-
-    // AI-Status prüfen
-    try {
-      const aiStatus = await api.aiStatus();
-      state.aiAvailable = aiStatus.available || false;
-    } catch { state.aiAvailable = false; }
+    await enterApp(result, $('#user').value.trim());
 
   } catch (err) {
     errorEl.textContent = err.message;

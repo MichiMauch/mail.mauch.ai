@@ -679,6 +679,82 @@ app.get('/api/csrf', (req, res) => {
   res.status(401).json({ error: 'Keine aktive Session.' });
 });
 
+// ── GET /api/status ───────────────────────────────────────
+// Prüft ob Session gültig ist und stellt Verbindung automatisch wieder her
+app.get('/api/status', async (req, res) => {
+  if (!req.session?.authenticated || !req.session.user) {
+    return res.status(401).json({ error: 'Keine aktive Session.' });
+  }
+
+  const conn = getConnection(req.session.id);
+  if (conn?.imap?.connected) {
+    // Verbindung existiert noch
+    return res.json({
+      success: true,
+      user: req.session.user,
+      smtpReady: !!conn.smtp,
+      csrfToken: req.session.csrfToken,
+    });
+  }
+
+  // Verbindung verloren → Reconnect mit gespeicherten Params
+  const params = req.session.connectParams;
+  if (!params) {
+    req.session.authenticated = false;
+    return res.status(401).json({ error: 'Session abgelaufen, erneut anmelden.' });
+  }
+
+  try {
+    const imapConfig = {
+      host: params.imapHost,
+      port: params.imapPort,
+      secure: true,
+      auth: params.authObj,
+      tls: {
+        rejectUnauthorized: process.env.TLS_REJECT_UNAUTHORIZED !== 'false',
+        servername: params.imapHost,
+        minVersion: 'TLSv1.2',
+      },
+    };
+
+    const imapClient = new IMAPClient(imapConfig);
+    await imapClient.connect();
+
+    let smtpClient = null;
+    try {
+      smtpClient = new SMTPClient();
+      const smtpSecure = parseInt(params.smtpPort) === 465;
+      await smtpClient.connect({
+        host: params.smtpHost,
+        port: params.smtpPort,
+        secure: smtpSecure,
+        auth: params.authObj,
+        tls: {
+          rejectUnauthorized: process.env.TLS_REJECT_UNAUTHORIZED !== 'false',
+          minVersion: 'TLSv1.2',
+        },
+      });
+    } catch {
+      smtpClient = null;
+    }
+
+    setConnection(req.session.id, imapClient, smtpClient, req.session.user);
+    req.session.lastActivity = Date.now();
+    console.log(`[Reconnect] OK – Session ${req.session.id.slice(0,8)}… für ${req.session.user}`);
+
+    return res.json({
+      success: true,
+      user: req.session.user,
+      smtpReady: !!smtpClient,
+      csrfToken: req.session.csrfToken,
+    });
+  } catch (err) {
+    console.warn(`[Reconnect] Fehlgeschlagen für ${req.session.user}: ${err.message}`);
+    req.session.authenticated = false;
+    return res.status(401).json({ error: 'Reconnect fehlgeschlagen, erneut anmelden.' });
+  }
+});
+
 // ── POST /api/connect ──────────────────────────────────────
 app.post('/api/connect', loginLimiter, async (req, res) => {
   try {
@@ -770,6 +846,15 @@ app.post('/api/connect', loginLimiter, async (req, res) => {
     req.session.user = user;
     req.session.lastActivity = Date.now();
     req.session.csrfToken = crypto.randomBytes(16).toString('hex');
+
+    // Reconnect-Daten in Session speichern (serverseitig, nicht im Cookie)
+    req.session.connectParams = {
+      authObj,
+      imapHost: finalImapHost,
+      imapPort: finalImapPort,
+      smtpHost: finalSmtpHost,
+      smtpPort: finalSmtpPort,
+    };
 
     // Verbindung an Session binden
     setConnection(req.session.id, imapClient, smtpClient, user);
