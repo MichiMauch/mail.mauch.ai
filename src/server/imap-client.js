@@ -323,6 +323,47 @@ export class IMAPClient {
     return result;
   }
 
+  // ── Entwürfe-Ordner automatisch erkennen ────────────────────
+  async _findDraftsFolder() {
+    try {
+      const folders = await this.listFolders();
+      const special = folders.find(f => f.specialUse === '\\Drafts');
+      if (special) return special.path;
+      const names = ['drafts', 'draft', 'entwürfe', 'entwurf'];
+      const byName = folders.find(f => names.includes(f.name.toLowerCase()));
+      if (byName) return byName.path;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  // ── Entwurf im Drafts-Ordner speichern ─────────────────────
+  async appendToDrafts(rawMessage) {
+    this._ensureConnected();
+    const draftsFolder = await this._findDraftsFolder();
+    if (!draftsFolder) {
+      console.warn('[IMAP] Kein Drafts-Ordner gefunden');
+      return null;
+    }
+    const result = await this.client.append(draftsFolder, rawMessage, ['\\Draft', '\\Seen']);
+    console.log(`[IMAP] Entwurf gespeichert in ${draftsFolder} (UID: ${result?.uid || '?'})`);
+    return { uid: result?.uid, folder: draftsFolder };
+  }
+
+  // ── Alten Entwurf löschen ──────────────────────────────────
+  async deleteDraft(folder, uid) {
+    this._ensureConnected();
+    const lock = await this.client.getMailboxLock(folder);
+    try {
+      await this.client.messageFlagsAdd(String(uid), ['\\Deleted'], { uid: true });
+      await this.client.messageDelete(String(uid), { uid: true });
+      console.log(`[IMAP] Alter Entwurf gelöscht: ${folder}/${uid}`);
+    } finally {
+      lock.release();
+    }
+  }
+
   // ── Thread-Nachrichten aus Sent-Ordner laden ───────────────
   async fetchSentThreadMessages(messageIds) {
     this._ensureConnected();

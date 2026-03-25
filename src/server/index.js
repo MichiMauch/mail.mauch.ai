@@ -29,6 +29,7 @@ import { securityLog } from './security-logger.js';
 import { createClient as createRedisClient } from 'redis';
 import { RedisStore } from 'connect-redis';
 import { AIService } from './ai-service.js';
+import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -1148,6 +1149,48 @@ app.post('/api/send', requireAuth, sendLimiter, async (req, res) => {
     res.json({ success: true, messageId: result.messageId, accepted: result.accepted, rejected: result.rejected });
   } catch (err) {
     res.status(500).json({ error: 'Senden fehlgeschlagen', details: err.message });
+  }
+});
+
+// ── POST /api/save-draft ───────────────────────────────────
+app.post('/api/save-draft', requireAuth, ensureConnection, async (req, res) => {
+  try {
+    const { to, cc, bcc, subject, text, inReplyTo, references, draftUid, draftFolder } = req.body;
+    const conn = getConnection(req.session.id);
+
+    // Raw RFC 2822 Message bauen (ohne zu senden)
+    const mailOptions = {
+      from: conn.user,
+      to: to ? stripHeaderInjection(sanitizeString(to, 2000)) : undefined,
+      cc: cc ? stripHeaderInjection(sanitizeString(cc, 2000)) : undefined,
+      bcc: bcc ? stripHeaderInjection(sanitizeString(bcc, 2000)) : undefined,
+      subject: subject ? stripHeaderInjection(sanitizeString(subject, 500)) : '(Kein Betreff)',
+      text: sanitizeString(text || '', 100000),
+      inReplyTo: inReplyTo ? stripHeaderInjection(sanitizeString(inReplyTo, 500)) : undefined,
+      references: references ? stripHeaderInjection(sanitizeString(references, 2000)) : undefined,
+    };
+
+    const composer = new MailComposer(mailOptions);
+    const rawMessage = await composer.compile().build();
+
+    // Alten Draft löschen (falls vorhanden)
+    if (draftUid && draftFolder) {
+      try {
+        await conn.imap.deleteDraft(draftFolder, parseInt(draftUid));
+      } catch (err) {
+        console.warn('[Draft] Alter Entwurf konnte nicht gelöscht werden:', err.message);
+      }
+    }
+
+    // Neuen Draft speichern
+    const result = await conn.imap.appendToDrafts(rawMessage);
+    if (!result) {
+      return res.status(500).json({ error: 'Kein Drafts-Ordner gefunden.' });
+    }
+
+    res.json({ success: true, draftUid: result.uid, draftFolder: result.folder });
+  } catch (err) {
+    res.status(500).json({ error: 'Entwurf speichern fehlgeschlagen', details: err.message });
   }
 });
 

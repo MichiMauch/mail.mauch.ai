@@ -24,6 +24,10 @@ const state = {
   isSearching: false,
   aiAvailable: false,         // AI-Funktion aktiv?
   composeContext: null,       // Original-Mail-Kontext für AI
+  currentDraftUid: null,     // UID des aktuellen Entwurfs
+  draftFolder: null,         // Pfad des Drafts-Ordners
+  draftSaveTimer: null,      // Debounce-Timer für Auto-Save
+  draftSaving: false,        // Verhindert parallele Saves
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -76,6 +80,7 @@ const api = {
   deleteBulk: (folder, uids) =>
     api.post(`/api/delete-bulk/${encodeURIComponent(folder)}`, { uids }),
   threadSent: (messageIds) => api.post('/api/thread-sent', { messageIds }),
+  saveDraft: (data) => api.post('/api/save-draft', data),
   aiStatus: () => api.get('/api/ai/status'),
   aiGenerate: (data) => api.post('/api/ai/generate', data),
 };
@@ -914,6 +919,51 @@ function showToast(message, type = 'info', duration = 3000) {
 //  COMPOSE / REPLY / FORWARD
 // ═══════════════════════════════════════════════════════════
 
+function scheduleDraftSave() {
+  if (state.draftSaveTimer) clearTimeout(state.draftSaveTimer);
+  state.draftSaveTimer = setTimeout(saveDraft, 3000);
+}
+
+async function saveDraft() {
+  // Nichts zu speichern wenn leer
+  const to = $('#compose-to')?.value?.trim() || '';
+  const subject = $('#compose-subject')?.value?.trim() || '';
+  const body = $('#compose-body')?.value?.trim() || '';
+  if (!to && !subject && !body) return;
+
+  // Kein paralleles Speichern
+  if (state.draftSaving) return;
+  state.draftSaving = true;
+
+  const statusEl = $('#compose-status');
+  try {
+    const result = await api.saveDraft({
+      to: $('#compose-to').value.trim(),
+      cc: $('#compose-cc').value.trim() || undefined,
+      bcc: $('#compose-bcc').value.trim() || undefined,
+      subject: $('#compose-subject').value,
+      text: $('#compose-body').value,
+      inReplyTo: $('#compose-in-reply-to').value || undefined,
+      references: $('#compose-references').value || undefined,
+      draftUid: state.currentDraftUid,
+      draftFolder: state.draftFolder,
+    });
+
+    if (result.success) {
+      state.currentDraftUid = result.draftUid;
+      state.draftFolder = result.draftFolder;
+      if (statusEl) {
+        statusEl.textContent = 'Entwurf gespeichert';
+        statusEl.className = 'compose-status success';
+      }
+    }
+  } catch {
+    // Stilles Scheitern — kein Fehler für den User
+  } finally {
+    state.draftSaving = false;
+  }
+}
+
 function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '', body = '', inReplyTo = '', references = '', aiContext = null } = {}) {
   const overlay = $('#compose-overlay');
   overlay.classList.add('open');
@@ -960,6 +1010,18 @@ function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '',
   const toggleBtn = $('#toggle-cc');
   if (toggleBtn) toggleBtn.classList.toggle('active', hasCc);
 
+  // Draft-State zurücksetzen
+  state.currentDraftUid = null;
+  state.draftFolder = null;
+  if (state.draftSaveTimer) clearTimeout(state.draftSaveTimer);
+
+  // Auto-Save: Debounced Draft-Speicherung bei Eingabe
+  const draftFields = ['#compose-to', '#compose-subject', '#compose-body'];
+  draftFields.forEach(sel => {
+    const el = $(sel);
+    if (el) el.addEventListener('input', scheduleDraftSave);
+  });
+
   // Cursor ins richtige Feld setzen
   setTimeout(() => {
     if (to && state.aiAvailable) {
@@ -974,9 +1036,17 @@ function openCompose({ title = 'Neue Nachricht', to = '', cc = '', subject = '',
 }
 
 function closeCompose() {
+  // Auto-Save Timer stoppen und Listener entfernen
+  if (state.draftSaveTimer) clearTimeout(state.draftSaveTimer);
+  ['#compose-to', '#compose-subject', '#compose-body'].forEach(sel => {
+    const el = $(sel);
+    if (el) el.removeEventListener('input', scheduleDraftSave);
+  });
+  state.currentDraftUid = null;
+  state.draftFolder = null;
+
   const overlay = $('#compose-overlay');
   overlay.classList.remove('open');
-  // Felder manuell zurücksetzen (kein <form> mehr)
   $('#compose-from').textContent = '';
   ['#compose-to', '#compose-cc', '#compose-bcc',
    '#compose-subject', '#compose-body', '#compose-in-reply-to',
@@ -1099,6 +1169,16 @@ async function sendMail() {
 
     const result = await api.send(mail);
     if (result.error) throw new Error(result.details || result.error);
+
+    // Draft löschen nach erfolgreichem Send
+    if (state.draftSaveTimer) clearTimeout(state.draftSaveTimer);
+    if (state.currentDraftUid && state.draftFolder) {
+      try {
+        await api.deleteMsg(state.draftFolder, state.currentDraftUid);
+      } catch { /* Draft-Cleanup best-effort */ }
+      state.currentDraftUid = null;
+      state.draftFolder = null;
+    }
 
     setSendLoading(false);
     statusEl.textContent = '✓ Gesendet';
