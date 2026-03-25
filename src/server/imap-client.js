@@ -295,6 +295,34 @@ export class IMAPClient {
     }
   }
 
+  // ── Gesendet-Ordner automatisch erkennen ───────────────────
+  async _findSentFolder() {
+    try {
+      const folders = await this.listFolders();
+      const special = folders.find(f => f.specialUse === '\\Sent');
+      if (special) return special.path;
+      const names = ['sent', 'sent messages', 'sent items', 'gesendet', 'gesendete objekte', 'envoyés'];
+      const byName = folders.find(f => names.includes(f.name.toLowerCase()));
+      if (byName) return byName.path;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  // ── Nachricht in Gesendet-Ordner speichern ────────────────
+  async appendToSent(rawMessage) {
+    this._ensureConnected();
+    const sentFolder = await this._findSentFolder();
+    if (!sentFolder) {
+      console.warn('[IMAP] Kein Sent-Ordner gefunden, Nachricht wird nicht gespeichert');
+      return null;
+    }
+    const result = await this.client.append(sentFolder, rawMessage, ['\\Seen']);
+    console.log(`[IMAP] Nachricht gespeichert in ${sentFolder}`);
+    return result;
+  }
+
   // ── Verbindung trennen ─────────────────────────────────────
   async disconnect() {
     if (this.client) {

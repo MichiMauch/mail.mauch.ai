@@ -7,6 +7,7 @@
  */
 
 import nodemailer from 'nodemailer';
+import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 
 export class SMTPClient {
   constructor() {
@@ -57,7 +58,7 @@ export class SMTPClient {
       throw new Error('SMTP nicht verbunden. Bitte zuerst connect() aufrufen.');
     }
 
-    const result = await this.transporter.sendMail({
+    const mailOptions = {
       from: mail.from,
       to: mail.to,
       cc: mail.cc || undefined,
@@ -68,13 +69,25 @@ export class SMTPClient {
       inReplyTo: mail.inReplyTo || undefined,
       references: mail.references || undefined,
       attachments: mail.attachments || undefined,
-    });
+    };
+
+    const result = await this.transporter.sendMail(mailOptions);
+
+    // Raw RFC 2822 Message für IMAP APPEND erzeugen
+    let rawMessage = null;
+    try {
+      const composer = new MailComposer(mailOptions);
+      rawMessage = await composer.compile().build();
+    } catch (err) {
+      console.warn('[SMTP] Raw-Nachricht konnte nicht erzeugt werden:', err.message);
+    }
 
     console.log(`[SMTP] Gesendet: ${result.messageId} → ${mail.to}`);
     return {
       messageId: result.messageId,
       accepted: result.accepted,
       rejected: result.rejected,
+      rawMessage,
     };
   }
 

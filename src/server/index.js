@@ -1030,7 +1030,16 @@ app.post('/api/send', requireAuth, sendLimiter, async (req, res) => {
       references: safeReferences,
     });
 
-    res.json({ success: true, ...result });
+    // Gesendete Nachricht im Sent-Ordner speichern (best-effort)
+    if (result.rawMessage && conn.imap) {
+      try {
+        await conn.imap.appendToSent(result.rawMessage);
+      } catch (err) {
+        console.warn('[SEND] Sent-Ordner speichern fehlgeschlagen:', err.message);
+      }
+    }
+
+    res.json({ success: true, messageId: result.messageId, accepted: result.accepted, rejected: result.rejected });
   } catch (err) {
     res.status(500).json({ error: 'Senden fehlgeschlagen', details: err.message });
   }
