@@ -319,9 +319,11 @@ async function loadFolders() {
     for (const folder of state.folders) {
       const el = document.createElement('div');
       el.className = `folder-item${folder.path === state.currentFolder ? ' active' : ''}`;
+      const badge = folder.unseen > 0 ? `<span class="folder-badge">${folder.unseen}</span>` : '';
       el.innerHTML = `
         <span class="folder-icon">${getFolderIcon(folder)}</span>
         <span class="folder-name">${escapeHtml(folder.name)}</span>
+        ${badge}
       `;
       el.addEventListener('click', () => selectFolder(folder.path));
       container.appendChild(el);

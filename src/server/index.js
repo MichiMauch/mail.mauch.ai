@@ -881,6 +881,13 @@ app.post('/api/connect', loginLimiter, async (req, res) => {
 app.get('/api/folders', requireAuth, ensureConnection, async (req, res) => {
   try {
     const folders = await req.imap.listFolders();
+    // Unread-Counts für alle Ordner laden
+    try {
+      const counts = await req.imap.getUnreadCounts(folders);
+      for (const folder of folders) {
+        folder.unseen = counts[folder.path] || 0;
+      }
+    } catch { /* Counts optional */ }
     res.json({ folders });
   } catch (err) {
     res.status(500).json({ error: 'Ordner konnten nicht geladen werden', details: err.message });

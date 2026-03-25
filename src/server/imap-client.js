@@ -47,6 +47,20 @@ export class IMAPClient {
     return this._flattenTree(tree);
   }
 
+  async getUnreadCounts(folders) {
+    this._ensureConnected();
+    const counts = {};
+    for (const folder of folders) {
+      try {
+        const status = await this.client.status(folder.path, { unseen: true });
+        if (status.unseen > 0) {
+          counts[folder.path] = status.unseen;
+        }
+      } catch { /* skip folders that don't support STATUS */ }
+    }
+    return counts;
+  }
+
   _flattenTree(node, result = []) {
     if (node.path) {
       result.push({
